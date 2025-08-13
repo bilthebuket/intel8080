@@ -66,6 +66,8 @@ instruction instructions[NUM_INSTRUCTIONS];
 void initialize(void);
 
 void update_flags(unsigned short prev, unsigned short post);
+unsigned short get_rp(unsigned char rp_index);
+void set_rp(unsigned char rp_index, unsigned short val);
 
 void mov(unsigned char operation, unsigned short data);
 void lxi(unsigned char operation, unsigned short data);
@@ -85,6 +87,9 @@ void sui(unsigned char operation, unsigned short data);
 void sbb(unsigned char operation, unsigned short data);
 void sbi(unsigned char operation, unsigned short data);
 void inr(unsigned char operation, unsigned short data);
+void dcr(unsigned char operation, unsigned short data);
+void inx(unsigned char operation, unsigned short data);
+void dcx(unsigned char operation, unsigned short data);
 
 int main(void)
 {
@@ -109,10 +114,10 @@ void initialize(void)
 		instructions[i] = &mov;
 	}
 
-	instructions[1] = &lxi;
-	instructions[17] = &lxi;
-	instructions[33] = &lxi;
-	instructions[49] = &lxi;
+	for (int i = 1; i <= 49; i += 16)
+	{
+		instructions[i] = &lxi;
+	}
 
 	instructions[58] = &lda;
 	instructions[50] = &sta;
@@ -151,18 +156,36 @@ void initialize(void)
 
 	instructions[222] = &sbi;
 
-	instructions[4] = &inr;
-	instructions[12] = &inr;
-	instructions[20] = &inr;
-	instructions[36] = &inr;
-	instructions[44] = &inr;
-	instructions[52] = &inr;
-	instructions[60] = &inr;
+	for (int i = 4; i <= 60; i += 8)
+	{
+		instructions[i] = &inr;
+		instructions[i + 1] = &dcr;
+	}
+
+	for (int i = 3; i <= 51; i += 16)
+	{
+		instructions[i] = &inx;
+		instructions[i + 8] = &dcx;
+	}
 }
 
 void update_flags(unsigned short prev, unsigned short post)
 {
 
+}
+
+unsigned short get_rp(unsigned char rp_index)
+{
+	unsigned short r = 0;
+	r += registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] << 8;
+	r += registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)];
+	return r;
+}
+
+void set_rp(unsigned char rp_index, unsigned short val)
+{
+	registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] = val >> 8;
+	registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)] = val;
 }
 
 void mov(unsigned char operation, unsigned short data)
@@ -205,8 +228,8 @@ void mov(unsigned char operation, unsigned short data)
 
 void lxi(unsigned char operation, unsigned short data)
 {
-	registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS] = data >> 8;
-	registers[register_pairs[operation & 48] & THREE_TO_FIVE_BITS] = data & 255;
+	unsigned short val = (data >> 8) + ((data & 255) << 8);
+	set_rp((operation & 48) >> 4, val);
 }
 
 void lda(unsigned char operation, unsigned short data)
@@ -233,12 +256,12 @@ void shld(unsigned char operation, unsigned short data)
 
 void ldax(unsigned char operation, unsigned short data)
 {
-	registers[A] = mem[registers[(register_pairs[operation & 48] & THREE_TO_FIVE_BITS] << 8) + registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS]];
+	registers[A] = mem[get_rp((operation & 48) >> 4)];
 }
 
 void stax(unsigned char operation, unsigned short data)
 {
-	mem[registers[(register_pairs[operation & 48] & THREE_TO_FIVE_BITS] << 8) + registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS]] = registers[A];
+	mem[get_rp((operation & 48) >> 4)] = registers[A];
 }
 
 void xchg(unsigned char operation, unsigned short data)
@@ -360,4 +383,36 @@ void inr(unsigned char operation, unsigned short data)
 	}
 
 	flags |= store;
+}
+
+void dcr(unsigned char operation, unsigned short data)
+{
+	unsigned char store = flags & FLAG_C;
+
+	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
+	{
+		mem[(registers[H] << 8) + registers[L]]--;
+		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]]);
+	}
+	else
+	{
+		registers[(operation & THREE_TO_FIVE_BITS) >> 3]--;
+		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] + 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3]);
+	}
+
+	flags |= store;
+}
+
+void inx(unsigned char operation, unsigned short data)
+{
+	unsigned short val = get_rp((operation & 48) >> 4);
+	val++;
+	set_rp((operation & 48) >> 4, val);
+}
+
+void dcx(unsigned char operation, unsigned short data)
+{
+	unsigned short val = get_rp((operation & 48) >> 4);
+	val--;
+	set_rp((operation & 48) >> 4, val);
 }
