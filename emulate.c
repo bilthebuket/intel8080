@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "operations.h"
 
 #define MEMORY_SIZE 65536
 
@@ -27,8 +26,17 @@
 #define FLAG_P (1 << 2) // if the reuslt of an operation is even
 #define FLAG_C (1 << 3) // if there is a wrap around
 #define FLAG_A (1 << 4) // if there was a carry out of bit 3 into bit 4
-			//
-#define NUM_INSTRUCTIONS 255;
+
+#define FLAG_Z_BIT 0
+#define FLAG_S_BIT 1
+#define FLAG_P_BIT 2
+#define FLAG_C_BIT 3
+#define FLAG_A_BIT 4
+
+#define NUM_INSTRUCTIONS 255
+
+#define ZERO_TO_TWO_BITS 7
+#define THREE_TO_FIVE_BITS 56
 
 // a single assembly instruction, where the unsigned char is the actual instruction and unsigned short
 // contains the subsquent data/memory address
@@ -36,7 +44,13 @@ typedef void (*instruction)(unsigned char, unsigned short);
 
 // registers
 unsigned char registers[REGISTER_MAXIMUM_ENCODING_VALUE];
+
+// each of the elements of the array are a 8 bit int that looks like this:
+// GGHHHLLL
+// where GG is a garbage value, HHH is the index in registers of the higher order register, 
+// and LLL is the index in registers of the lower order register
 unsigned char register_pairs[NUM_REGISTER_PAIR_ENCODINGS];
+
 unsigned short SP;
 unsigned short IP;
 
@@ -51,9 +65,26 @@ instruction instructions[NUM_INSTRUCTIONS];
 */
 void initialize(void);
 
+void update_flags(unsigned short prev, unsigned short post);
+
 void mov(unsigned char operation, unsigned short data);
 void lxi(unsigned char operation, unsigned short data);
 void lda(unsigned char operation, unsigned short data);
+void sta(unsigned char operation, unsigned short data);
+void lhld(unsigned char operation, unsigned short data);
+void shld(unsigned char operation, unsigned short data);
+void ldax(unsigned char operation, unsigned short data);
+void stax(unsigned char operation, unsigned short data);
+void xchg(unsigned char operation, unsigned short data);
+void add(unsigned char operation, unsigned short data);
+void adi(unsigned char operation, unsigned short data);
+void adc(unsigned char operation, unsigned short data);
+void aci(unsigned char operation, unsigned short data);
+void sub(unsigned char operation, unsigned short data);
+void sui(unsigned char operation, unsigned short data);
+void sbb(unsigned char operation, unsigned short data);
+void sbi(unsigned char operation, unsigned short data);
+void inr(unsigned char operation, unsigned short data);
 
 int main(void)
 {
@@ -67,6 +98,8 @@ void initialize(void)
 	register_pairs[H-L] = (H << 3) + L;
 	register_pairs[S-P] = (S << 3) + P;
 
+	// these include some instructions that shouldn't be mov but they'll get overwritten later
+	// in the function
 	for (int i = 64; i < 128; i++)
 	{
 		instructions[i] = &mov;
@@ -80,6 +113,56 @@ void initialize(void)
 	instructions[17] = &lxi;
 	instructions[33] = &lxi;
 	instructions[49] = &lxi;
+
+	instructions[58] = &lda;
+	instructions[50] = &sta;
+	instructions[42] = &lhld;
+	instructions[10 + (B-C << 4)] = &ldax;
+	instructions[10 + (D-E << 4)] = &ldax;
+	instructions[2 + (B-C << 4)] = &stax;
+	instructions[2 + (D-E << 4)] = &stax;
+	instructions[235] = &xchg;
+
+	for (int i = 128; i < 136; i++)
+	{
+		instructions[i] = &add;
+	}
+
+	instructions[198] = &adi;
+
+	for (int i = 136; i < 144; i++)
+	{
+		instructions[i] = &adc;
+	}
+
+	instructions[206] = &aci;
+
+	for (int i = 144; i < 152; i++)
+	{
+		instructions[i] = &sub;
+	}
+
+	instructions[214] = &sui;
+
+	for (int i = 152 i < 160; i++)
+	{
+		instructions[i] = &sbb;
+	}
+
+	instructions[222] = &sbi;
+
+	instructions[4] = &inr;
+	instructions[12] = &inr;
+	instructions[20] = &inr;
+	instructions[36] = &inr;
+	instructions[44] = &inr;
+	instructions[52] = &inr;
+	instructions[60] = &inr;
+}
+
+void update_flags(unsigned short prev, unsigned short post)
+{
+
 }
 
 void mov(unsigned char operation, unsigned short data)
@@ -90,11 +173,11 @@ void mov(unsigned char operation, unsigned short data)
 	}
 
 	unsigned char src;
-	unsigned char dest = (operation & 56) >> 3;;
+	unsigned char dest = (operation & THREE_TO_FIVE_BITS) >> 3;;
 
 	if (operation & (1 << 6))
 	{
-		src = operation & 7;
+		src = operation & ZERO_TO_TWO_BITS;
 
 		if (src == H-L_MEM)
 		{
@@ -122,11 +205,159 @@ void mov(unsigned char operation, unsigned short data)
 
 void lxi(unsigned char operation, unsigned short data)
 {
-	registers[register_pairs[operation & 48] & 7] = data >> 8;
-	registers[register_pairs[operation & 48] & 56] = data & 255;
+	registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS] = data >> 8;
+	registers[register_pairs[operation & 48] & THREE_TO_FIVE_BITS] = data & 255;
 }
 
 void lda(unsigned char operation, unsigned short data)
 {
+	registers[A] = mem[(data << 8) + (data >> 8)];
+}
+
+void sta(unsigned char operation, unsigned short data)
+{
+	mem[(data << 8) + (data >> 8)] = registers[A];
+}
+
+void lhld(unsigned char operation, unsigned short data)
+{
+	registers[L] = mem[(data << 8) + (data >> 8)];
+	registers[H] = mem[(data << 8) + (data >> 8) + 1];
+}
+
+void shld(unsigned char operation, unsigned short data)
+{
+	mem[(data << 8) + (data >> 8)] = registers[L];
+	mem[(data << 8) + (data >> 8) + 1] = registers[H];
+}
+
+void ldax(unsigned char operation, unsigned short data)
+{
+	registers[A] = mem[registers[(register_pairs[operation & 48] & THREE_TO_FIVE_BITS] << 8) + registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS]];
+}
+
+void stax(unsigned char operation, unsigned short data)
+{
+	mem[registers[(register_pairs[operation & 48] & THREE_TO_FIVE_BITS] << 8) + registers[register_pairs[operation & 48] & ZERO_TO_TWO_BITS]] = registers[A];
+}
+
+void xchg(unsigned char operation, unsigned short data)
+{
+	unsigned char tmp = registers[H];
+	registers[H] = registers[D];
+	registers[D] = tmp;
+
+	tmp = registers[L];
+	registers[L] = registers[E];
+	registers[E] = tmp;
+}
+
+void add(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation & ZERO_TO_TWO_BITS == 6)
+	{
+		registers[A] += mem[(registers[H] << 8) + registers[L]];
+	}
+	else
+	{
+		registers[A] += registers[operation & ZERO_TO_TWO_BITS];
+	}
+
+	update_flags(store, registers[A]);
+}
+
+void adi(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] += data >> 8;
+	update_flags(store, registers[A]);
+}
+
+void adc(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation & ZERO_TO_TWO_BITS == 6)
+	{
+		registers[A] += mem[(registers[H] << 8) + registers[L]] + (flags & FLAG_C);
+	}
+	else
+	{
+		registers[A] += registers[operation & ZERO_TO_TWO_BITS] + (flags & FLAG_C);
+	}
+
+	update_flags(store, registers[A]);
+}
+
+void aci(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] += (data >> 8) + (flags & FLAG_C);
+	update_flags(store, registers[A]);
+}
+
+void sub(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation & ZERO_TO_TWO_BITS == 6)
+	{
+		registers[A] -= mem[(registers[H] << 8) + registers[L]];
+	}
+	else
+	{
+		registers[A] -= registers[operation & ZERO_TO_TWO_BITS];
+	}
+
+	update_flags(store, registers[A]);
+}
+
+void sui(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] -= data >> 8;
+	update_flags(store, registers[A]);
+}
+
+void sbb(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation & ZERO_TO_TWO_BITS == 6)
+	{
+		registers[A] -= mem[(registers[H] << 8) + registers[L]] + FLAG_C;
+	}
+	else
+	{
+		registers[A] -= registers[operation & ZERO_TO_TWO_BITS] + FLAG_C:
+	}
+
+	update_flags(store, registers[A]);
+}
+
+void sbi(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] -= (data >> 8) + FLAG_C;
+	update_flags(store, registers[A]);
+}
+
+void inr(unsigned char operation, unsigned short data)
+{
+	unsigned char store = flags & FLAG_C;
 	
+	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
+	{
+		mem[(registers[H] << 8) + registers[L]]++;
+		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]]);
+	}
+	else
+	{
+		registers[(operation & THREE_TO_FIVE_BITS) >> 3]++;
+		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] - 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3]);
+	}
+
+	flags |= store;
 }
