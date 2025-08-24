@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 
 #define MEMORY_SIZE 65536
 
@@ -65,7 +66,8 @@ instruction instructions[NUM_INSTRUCTIONS];
 */
 void initialize(void);
 
-void update_flags(unsigned short prev, unsigned short post);
+void update_flags(unsigned char prev, unsigned char post, bool add);
+
 unsigned short get_rp(unsigned char rp_index);
 void set_rp(unsigned char rp_index, unsigned short val);
 
@@ -90,6 +92,16 @@ void inr(unsigned char operation, unsigned short data);
 void dcr(unsigned char operation, unsigned short data);
 void inx(unsigned char operation, unsigned short data);
 void dcx(unsigned char operation, unsigned short data);
+void dad(unsigned char operation, unsigned short data);
+void daa(unsigned char operation, unsigned short data);
+void ana(unsigned char operation, unsigned short data);
+void ani(unsigned char operation, unsigned short data);
+void xra(unsigned char operation, unsigned short data);
+void xri(unsigned char operation, unsigned short data);
+void ora(unsigned char operation, unsigned short data);
+void ori(unsigned char operation, unsigned short data);
+void cmp(unsigned char operation, unsigned short data);
+void cpi(unsigned char operation, unsigned short data);
 
 int main(void)
 {
@@ -167,11 +179,80 @@ void initialize(void)
 		instructions[i] = &inx;
 		instructions[i + 8] = &dcx;
 	}
+
+	for (int i = 9; i <= 57; i += 16)
+	{
+		instructions[i] = &dad;
+	}
+
+	instructions[39] = &daa;
+
+	for (int i = 160; i <= 167; i++)
+	{
+		instructions[i] = &ana;
+	}
+
+	instructions[230] = &ani;
+
+	for (int i = 168; i <= 175; i++)
+	{
+		instructions[i] = &xra;
+	}
+
+	instructions[238] = &xri;
+
+	for (int i = 176; i <= 183; i+=)
+	{
+		instructions[i] = &ora;
+	}
+
+	instructions[246] = &ori;
+
+	for (int i = 184; i <= 191; i++)
+	{
+		instructions[i] = &cmp;
+	}
+
+	instructions[254] = &cpi;
 }
 
-void update_flags(unsigned short prev, unsigned short post)
+void update_flags(unsigned char prev, unsigned char post, bool add)
 {
+	flags = 0;
 
+	if (post == 0)
+	{
+		flags |= FLAG_Z;
+	}
+	if (post & 128)
+	{
+		flags |= FLAG_S;
+	}
+	if (post & 2 == 0)
+	{
+		flags |= FLAG_P;
+	}
+	if (prev & 128 && !(post & 128))
+	{
+		flags |= FLAG_C;
+	}
+
+	if (add)
+	{
+		unsigned char diff = post - prev;
+		if ((prev & 15) + (diff & 15) < (prev & 15))
+		{
+			flags |= FLAG_A;
+		}
+	}
+	else
+	{
+		unsigned char diff = prev - post;
+		if ((prev & 15) - (diff & 15) > (prev & 15))
+		{
+			flags |= FLAG_A;
+		}
+	}
 }
 
 unsigned short get_rp(unsigned char rp_index)
@@ -288,14 +369,14 @@ void add(unsigned char operation, unsigned short data)
 		registers[A] += registers[operation & ZERO_TO_TWO_BITS];
 	}
 
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], true);
 }
 
 void adi(unsigned char operation, unsigned short data)
 {
 	unsigned char store = registers[A];
 	registers[A] += data >> 8;
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], true);
 }
 
 void adc(unsigned char operation, unsigned short data)
@@ -311,14 +392,14 @@ void adc(unsigned char operation, unsigned short data)
 		registers[A] += registers[operation & ZERO_TO_TWO_BITS] + (flags & FLAG_C);
 	}
 
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], true);
 }
 
 void aci(unsigned char operation, unsigned short data)
 {
 	unsigned char store = registers[A];
 	registers[A] += (data >> 8) + (flags & FLAG_C);
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], true);
 }
 
 void sub(unsigned char operation, unsigned short data)
@@ -334,14 +415,14 @@ void sub(unsigned char operation, unsigned short data)
 		registers[A] -= registers[operation & ZERO_TO_TWO_BITS];
 	}
 
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], false);
 }
 
 void sui(unsigned char operation, unsigned short data)
 {
 	unsigned char store = registers[A];
 	registers[A] -= data >> 8;
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], false);
 }
 
 void sbb(unsigned char operation, unsigned short data)
@@ -357,14 +438,14 @@ void sbb(unsigned char operation, unsigned short data)
 		registers[A] -= registers[operation & ZERO_TO_TWO_BITS] + FLAG_C:
 	}
 
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], false);
 }
 
 void sbi(unsigned char operation, unsigned short data)
 {
 	unsigned char store = registers[A];
 	registers[A] -= (data >> 8) + FLAG_C;
-	update_flags(store, registers[A]);
+	update_flags(store, registers[A], false);
 }
 
 void inr(unsigned char operation, unsigned short data)
@@ -374,12 +455,12 @@ void inr(unsigned char operation, unsigned short data)
 	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]++;
-		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]]);
+		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]], true);
 	}
 	else
 	{
 		registers[(operation & THREE_TO_FIVE_BITS) >> 3]++;
-		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] - 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3]);
+		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] - 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3], true);
 	}
 
 	flags |= store;
@@ -392,12 +473,12 @@ void dcr(unsigned char operation, unsigned short data)
 	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]--;
-		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]]);
+		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]], false);
 	}
 	else
 	{
 		registers[(operation & THREE_TO_FIVE_BITS) >> 3]--;
-		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] + 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3]);
+		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] + 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3], false);
 	}
 
 	flags |= store;
@@ -415,4 +496,125 @@ void dcx(unsigned char operation, unsigned short data)
 	unsigned short val = get_rp((operation & 48) >> 4);
 	val--;
 	set_rp((operation & 48) >> 4, val);
+}
+
+void dad(unsigned char operation, unsigned short data)
+{
+	unsigned short start_value = get_rp(H-L);
+	unsigned short end_value = start_value + get_rp((operation & 48) >> 4);
+	set_rp(H-L, end_value);
+	if (start_value > end_value)
+	{
+		flags |= FLAG_C;
+	}
+}
+
+void daa(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (registers[A] & 15 > 9 || flags & FLAG_A)
+	{
+		registers[A] += 6;
+	}
+	if ((registers[A] >> 4) & 15 > 9 || flags & FLAG_C)
+	{
+		registers[A] += 96;
+	}
+
+	update_flags(store, registers[A], true);
+}
+
+void ana(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation == 166)
+	{
+		registers[A] &= mem[get_rp(H-L)];
+	}
+	else
+	{
+		registers[A] &= registers[operation & 7];
+	}
+
+	update_flags(store, registers[A], true);
+	flags & (255 - FLAG_C) | FLAG_A;
+}
+
+void ani(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] &= data >> 8;
+	update_flags(store, registers[A], true);
+	flags = flags & (255 - FLAG_C - FLAG_A);
+}
+
+void xra(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation == 174)
+	{
+		registers[A] ^= mem[get_rp(H-L)];
+	}
+	else
+	{
+		registers[A] ^= registers[operation & 7];
+	}
+
+	update_flags(store, registers[A], true);
+	flags = flags & (255 - FLAG_C - FLAG_A);
+}
+
+void xri(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] ^= data >> 8;
+	update_flags(store, registers[A], true);
+	flags = flags & (255 - FLAG_C - FLAG_A);
+}
+
+void ora(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+
+	if (operation == 182)
+	{
+		registers[A] |= mem[get_rp(H-L)];
+	}
+	else
+	{
+		registers[A] |= registers[operation & 7];
+	}
+
+	update_flags(store, registers[A], true);
+	flags = flags - & (255 - FLAG_C - FLAG_A);
+}
+
+void ori(unsigned char operation, unsigned short data)
+{
+	unsigned char store = registers[A];
+	registers[A] |= data >> 8;
+	update_flags(store, registers[A], true);
+	flags = flags & (255 - FLAG_C - FLAG_A);
+}
+
+void cmp(unsigned char operation, unsigned short data)
+{
+	unsigned char subtractor;
+	if (operation == 190)
+	{
+		subtractor = mem[get_rp(H-L)];
+	}
+	else
+	{
+		subtractor = registers[operation & 7];
+	}
+	update_flags(registers[A], registers[A] - subtractor);
+}
+
+void cpi(unsigned char operation, unsigned short data)
+{
+	update_flags(registers[A], registers[A] - (data >> 8));
 }
