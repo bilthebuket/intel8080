@@ -102,6 +102,15 @@ void ora(unsigned char operation, unsigned short data);
 void ori(unsigned char operation, unsigned short data);
 void cmp(unsigned char operation, unsigned short data);
 void cpi(unsigned char operation, unsigned short data);
+void rlc(unsigned char operation, unsigned short data);
+void rrc(unsigned char operation, unsigned short data);
+void ral(unsigned char operation, unsigned short data);
+void rar(unsigned char operation, unsigned short data);
+void cma(unsigned char operation, unsigned short data);
+void cmc(unsigned char operation, unsigned short data);
+void stc(unsigned char operation, unsigned short data);
+void jmp(unsigned char operation, unsigned short data);
+void jcon(unsigned char operation, unsigned short data);
 
 int main(void)
 {
@@ -214,6 +223,14 @@ void initialize(void)
 	}
 
 	instructions[254] = &cpi;
+	instructions[7] = &rlc;
+	instructions[15] = &rrc;
+	instructions[23] = &ral;
+	instructions[31] = &rar;
+	instructions[47] = &cma;
+	instructions[63] = &cmc;
+	instructions[55] = &stc;
+	instructions[195] = &jmp;
 }
 
 void update_flags(unsigned char prev, unsigned char post, bool add)
@@ -618,3 +635,98 @@ void cpi(unsigned char operation, unsigned short data)
 {
 	update_flags(registers[A], registers[A] - (data >> 8));
 }
+
+void rlc(unsigned char operation, unsigned short data)
+{
+	unsigned char num = registers[A] >> 7;
+	registers[A] <<= 1;
+	registers[A] |= num;
+	if (num)
+	{
+		flags |= FLAG_C;
+	}
+	else
+	{
+		flags &= 255 - FLAG_C;
+	}
+}
+
+void rrc(unsigned char operation, unsigned short data)
+{
+	unsigned char num = registers[A] << 7;
+	regsters[A] >>= 1;
+	registers[A] |= num;
+	if (num)
+	{
+		flags |= FLAG_C;
+	}
+	else
+	{
+		flags &= 255 - FLAG_C;
+	}
+}
+
+void ral(unsigned char operation, unsigned short data)
+{
+	unsigned char store = 0;
+	if (flags & FLAG_C)
+	{
+		store = 1;
+	}
+
+	if (registers[A] & 127)
+	{
+		flags |= FLAG_C;
+	}
+	else
+	{
+		flags &= 255 - FLAG_C;
+	}
+
+	registers[A] <<= 1;
+	registers[A] = store | (registers[A] & 1);
+
+void rar(unsigned char operation, unsigned short data)
+{
+	unsigned char store = 0;
+	if (flags & FLAG_C)
+	{
+		store = 128;
+	}
+
+	if (registers[A] & 1)
+	{
+		flags |= FLAG_C;
+	}
+	else
+	{
+		flags &= 255 - FLAG_C;
+	}
+
+	registers[A] >>= 1;
+	registers[A] = store | (regsiters[A] & 127);
+}
+
+void cma(unsigned char operation, unsigned short data)
+{
+	registers[A] = ~registers[A];
+}
+
+void cmc(unsigned char operation, unsigned short data)
+{
+	flags ^= FLAG_C;
+}
+
+void stc(unsigned char operation, unsigned short data)
+{
+	flags |= FLAG_C;
+}
+
+void jmp(unsigned char operation, unsigned short data)
+{
+	IP = (data << 8) + (data >> 8);
+}
+
+void jcon(unsigned char operation, unsigned short data)
+{
+
