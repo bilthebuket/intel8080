@@ -35,6 +35,7 @@
 #define FLAG_A_BIT 4
 
 #define NUM_INSTRUCTIONS 255
+#define NUM_CONDITIONS 8
 
 #define ZERO_TO_TWO_BITS 7
 #define THREE_TO_FIVE_BITS 56
@@ -42,6 +43,9 @@
 // a single assembly instruction, where the unsigned char is the actual instruction and unsigned short
 // contains the subsquent data/memory address
 typedef void (*instruction)(unsigned char, unsigned short);
+
+// checks a condition (zero, not zero, carry, not carry, etc)
+typedef bool (*condition_check)(void);
 
 // registers
 unsigned char registers[REGISTER_MAXIMUM_ENCODING_VALUE];
@@ -55,11 +59,13 @@ unsigned char register_pairs[NUM_REGISTER_PAIR_ENCODINGS];
 unsigned short SP;
 unsigned short IP;
 
-unsigned char flags;
+unsigned char flags = 0;
 
 unsigned char mem[MEMORY_SIZE];
 
 instruction instructions[NUM_INSTRUCTIONS];
+
+condition_check condition_checks[NUM_CONDITIONS];
 
 /*
  * initialize the array of instructions and register pair array
@@ -111,14 +117,35 @@ void cmc(unsigned char operation, unsigned short data);
 void stc(unsigned char operation, unsigned short data);
 void jmp(unsigned char operation, unsigned short data);
 void jcon(unsigned char operation, unsigned short data);
+void call(unsigned char operation, unsigned short data);
+void ccall(unsigned char operation, unsigned short data);
+void ret(unsigned char operation, unsigned short data);
+
+bool not_zero(void);
+bool zero(void);
+bool no_carry(void);
+bool carry(void);
+bool parity_odd(void);
+bool parity_even(void);
+bool plus(void);
+bool minus(void);
 
 int main(void)
 {
-	flags = 0;
+	
 }
 
 void initialize(void)
 {
+	condition_checks[0] = &not_zero;
+	condition_checks[1] = &zero;
+	condition_checks[2] = &no_carry;
+	condition_checks[3] = &carry;
+	condition_checks[4] = &parity_odd;
+	condition_checks[5] = &parity_even;
+	condition_checks[6] = &plus;
+	condition_checks[7] = &minus;
+
 	register_pairs[B-C] = (B << 3) + C;
 	register_pairs[D-E] = (D << 3) + E;
 	register_pairs[H-L] = (H << 3) + L;
@@ -210,7 +237,7 @@ void initialize(void)
 
 	instructions[238] = &xri;
 
-	for (int i = 176; i <= 183; i+=)
+	for (int i = 176; i <= 183; i++)
 	{
 		instructions[i] = &ora;
 	}
@@ -231,6 +258,20 @@ void initialize(void)
 	instructions[63] = &cmc;
 	instructions[55] = &stc;
 	instructions[195] = &jmp;
+	
+	for (int i = 194; i <= 250; i += 8)
+	{
+		instructions[i] = &jcon;
+	}
+
+	instructions[205] = &call;
+	
+	for (int i = 193; i<= 249; i += 8)
+	{
+		instructions[i] = &ccall;
+	}
+
+	instructions[201] = &ret;
 }
 
 void update_flags(unsigned char prev, unsigned char post, bool add)
@@ -284,6 +325,46 @@ void set_rp(unsigned char rp_index, unsigned short val)
 {
 	registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] = val >> 8;
 	registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)] = val;
+}
+
+bool not_zero(void)
+{
+	return !(flag & FLAG_Z);
+}
+
+bool zero(void)
+{
+	return flag & FLAG_Z;
+}
+
+bool no_carry(void)
+{
+	return !(flag & FLAG_C);
+}
+
+bool carry(void)
+{
+	return flag & FLAG_C;
+}
+
+bool parity_odd(void)
+{
+	return !(flag & FLAG_P);
+}
+
+bool parity_even(void)
+{
+	return flag & FLAG_P;
+}
+
+bool plus(void)
+{
+	return !(flag & FLAG_S);
+}
+
+bool minus(void)
+{
+	return flag & FLAG_S;
 }
 
 void mov(unsigned char operation, unsigned short data)
@@ -729,4 +810,34 @@ void jmp(unsigned char operation, unsigned short data)
 
 void jcon(unsigned char operation, unsigned short data)
 {
+	if (condition_checks[(operation & 56) >> 3])
+	{
+		IP = (data << 8) + (data >> 8);
+	}
+}
 
+void call(unsigned char operation, unsigned short data)
+{
+	mem[SP - 1] = IP >> 8;
+	mem[SP - 2] = IP & 255;
+	SP -= 2;
+	IP = (data << 8) + (data >> 8);
+}
+
+void ccall(unsigned char operation, unsigned short data)
+{
+	if (condition_checks[(operation & 56) >> 3])
+	{
+		mem[SP - 1] = IP >> 8;
+		mem[SP - 2] = IP & 255;
+		SP -= 2;
+		IP = (data << 8) + (data >> 8);
+	}
+}
+
+void ret(unsigned char operation, unsigned short data)
+{
+	IP = 0;
+	IP += mem[SP] + (mem[SP + 1] << 8);
+	SP += 2;
+}
