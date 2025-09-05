@@ -22,7 +22,7 @@
 #define S-P 11
 
 // zero, sign, parity, carry, and auxiliary carry flags
-#define FLAG_Z (0) // if the result of an operation is zero
+#define FLAG_Z (1) // if the result of an operation is zero
 #define FLAG_S (1 << 1) // if the result of an operation leads to the sign bit (most siginificant bit) being 1
 #define FLAG_P (1 << 2) // if the reuslt of an operation is even
 #define FLAG_C (1 << 3) // if there is a wrap around
@@ -120,6 +120,16 @@ void jcon(unsigned char operation, unsigned short data);
 void call(unsigned char operation, unsigned short data);
 void ccall(unsigned char operation, unsigned short data);
 void ret(unsigned char operation, unsigned short data);
+void cret(unsigned char operation, unsigned short data);
+void rst(unsigned char operation, unsigned short data);
+void pchl(unsigned char operation, unsigned short data);
+void push(unsigned char operation, unsigned short data);
+void pushp(unsigned char operation, unsigned short data);
+void pop(unsigned char operation, unsigned short data);
+void popp(unsigned char operation, unsigned short data);
+void xthl(unsigned char operation, unsigned short data);
+void sphl(unsigned char operation, unsigned short data);
+void in(unsigned char operation, unsigned short data);
 
 bool not_zero(void);
 bool zero(void);
@@ -272,6 +282,34 @@ void initialize(void)
 	}
 
 	instructions[201] = &ret;
+
+	for (int i = 192; i <= 248; i += 8)
+	{
+		instructions[i] = &cret;
+	}
+
+	for (int i = 199; i <= 255; i += 8)
+	{
+		instructions[i] = &rst;
+	}
+
+	instructions[233] = &pchl;
+
+	for (int i = 197; i <= 229; i += 16)
+	{
+		instructions[i] = &push;
+	}
+
+	instructions[245] = &pushp;
+
+	for (int i = 193; i <= 225; i += 16)
+	{
+		instructions[i] = &pop;
+	}
+
+	instructions[241] = &popp;
+	instructions[227] = &xthl;
+	instructions[249] = &sphl;
 }
 
 void update_flags(unsigned char prev, unsigned char post, bool add)
@@ -840,4 +878,88 @@ void ret(unsigned char operation, unsigned short data)
 	IP = 0;
 	IP += mem[SP] + (mem[SP + 1] << 8);
 	SP += 2;
+}
+
+void cret(unsigned char operation, unsigned short data)
+{
+	if (condition_checks[(operation & 56) >> 3])
+	{
+		IP = 0;
+		IP += mem[SP] + (mem[SP + 1] << 8);
+		SP += 2;
+	}
+}
+
+void rst(unsigned char operation, unsigned short data)
+{
+	mem[SP - 1] = IP >> 8;
+	mem[SP - 2] = IP & 255;
+	SP -= 2;
+	IP = operation & 56;
+}
+
+void pchl(unsigned char operation, unsigned short data)
+{
+	IP = H << 8;
+	IP += L;
+}
+
+void push(unsigned char operation, unsigned short data)
+{
+	mem[SP - 1] = registers[register_pairs[(operation & 48) >> 4] >> 3];
+	mem[SP - 2] = registers[register_pairs[(operation & 48) >> 4] & 7];
+	SP -= 2;
+}
+
+void pushp(unsigned char operation, unsigned short data)
+{
+	mem[SP - 1] = registers[A];
+	int val = 2;
+	val += (flags & FLAG_C) >> 3;
+	val += (flags & FLAG_P);
+	val += (flags & FLAG_A);
+	val += (flags & FLAG_Z) << 6;
+	val += (flags & FLAG_S) << 6;
+	mem[SP - 2] = val;
+	SP -= 2;
+}
+
+void pop(unsigned char operation, unsigned short data)
+{
+	registers[register_pairs[(operation & 48) >> 4] >> 3] = mem[SP - 1];
+	registers[register_pairs[(operation & 48) >> 4] & 7] = mem[SP - 2];
+	SP += 2;
+}
+
+void popp(unsigned char operation, unsigned short data)
+{
+	flags = 0;
+	flags += (mem[SP] & 1) << FLAG_C_BIT;
+	flags += (mem[SP] & 4);
+	flags += (mem[SP] & 16);
+	flags += (mem[SP] & 64) >> 6;
+	flags += (mem[SP] & 128) >> 6;
+	registers[A] = mem[SP + 1];
+	SP += 2;
+}
+
+void xthl(unsigned char operation, unsigned short data)
+{
+	unsigned char temp;
+	temp = registers[L];
+	registers[L] = mem[SP];
+	mem[SP] = temp;
+	temp = registers[H];
+	registers[H] = mem[SP + 1];
+	mem[SP + 1] = temp;
+}
+
+void sphl(unsigned char operation, unsigned short data)
+{
+	SP = (registers[H] << 8) + registers[L];
+}
+
+void in(unsigned char operation, unsigned short data)
+{
+
 }
