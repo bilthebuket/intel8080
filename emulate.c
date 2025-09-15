@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <SDL2/SDL.h>
 
 #define MEMORY_SIZE 65536
 
@@ -22,9 +25,9 @@
 #define S-P 11
 
 // zero, sign, parity, carry, and auxiliary carry flags
-#define FLAG_Z (1) // if the result of an operation is zero
-#define FLAG_S (1 << 1) // if the result of an operation leads to the sign bit (most siginificant bit) being 1
-#define FLAG_P (1 << 2) // if the reuslt of an operation is even
+#define FLAG_Z (1) // if the result of an mem[IP] is zero
+#define FLAG_S (1 << 1) // if the result of an mem[IP] leads to the sign bit (most siginificant bit) being 1
+#define FLAG_P (1 << 2) // if the reuslt of an mem[IP] is even
 #define FLAG_C (1 << 3) // if there is a wrap around
 #define FLAG_A (1 << 4) // if there was a carry out of bit 3 into bit 4
 
@@ -40,9 +43,11 @@
 #define ZERO_TO_TWO_BITS 7
 #define THREE_TO_FIVE_BITS 56
 
+#define NUM_PORTS 7
+
 // a single assembly instruction, where the unsigned char is the actual instruction and unsigned short
 // contains the subsquent data/memory address
-typedef void (*instruction)(unsigned char, unsigned short);
+typedef void (*instruction)(void);
 
 // checks a condition (zero, not zero, carry, not carry, etc)
 typedef bool (*condition_check)(void);
@@ -63,6 +68,14 @@ unsigned char flags = 0;
 
 unsigned char mem[MEMORY_SIZE];
 
+bool can_interrupt = true;
+
+sem_t sems[NUM_PORTS];
+unsigned char ports[NUM_PORTS];
+pthread_t shift_register_thread;
+
+unsigned short shift_register;
+
 instruction instructions[NUM_INSTRUCTIONS];
 
 condition_check condition_checks[NUM_CONDITIONS];
@@ -77,59 +90,66 @@ void update_flags(unsigned char prev, unsigned char post, bool add);
 unsigned short get_rp(unsigned char rp_index);
 void set_rp(unsigned char rp_index, unsigned short val);
 
-void mov(unsigned char operation, unsigned short data);
-void lxi(unsigned char operation, unsigned short data);
-void lda(unsigned char operation, unsigned short data);
-void sta(unsigned char operation, unsigned short data);
-void lhld(unsigned char operation, unsigned short data);
-void shld(unsigned char operation, unsigned short data);
-void ldax(unsigned char operation, unsigned short data);
-void stax(unsigned char operation, unsigned short data);
-void xchg(unsigned char operation, unsigned short data);
-void add(unsigned char operation, unsigned short data);
-void adi(unsigned char operation, unsigned short data);
-void adc(unsigned char operation, unsigned short data);
-void aci(unsigned char operation, unsigned short data);
-void sub(unsigned char operation, unsigned short data);
-void sui(unsigned char operation, unsigned short data);
-void sbb(unsigned char operation, unsigned short data);
-void sbi(unsigned char operation, unsigned short data);
-void inr(unsigned char operation, unsigned short data);
-void dcr(unsigned char operation, unsigned short data);
-void inx(unsigned char operation, unsigned short data);
-void dcx(unsigned char operation, unsigned short data);
-void dad(unsigned char operation, unsigned short data);
-void daa(unsigned char operation, unsigned short data);
-void ana(unsigned char operation, unsigned short data);
-void ani(unsigned char operation, unsigned short data);
-void xra(unsigned char operation, unsigned short data);
-void xri(unsigned char operation, unsigned short data);
-void ora(unsigned char operation, unsigned short data);
-void ori(unsigned char operation, unsigned short data);
-void cmp(unsigned char operation, unsigned short data);
-void cpi(unsigned char operation, unsigned short data);
-void rlc(unsigned char operation, unsigned short data);
-void rrc(unsigned char operation, unsigned short data);
-void ral(unsigned char operation, unsigned short data);
-void rar(unsigned char operation, unsigned short data);
-void cma(unsigned char operation, unsigned short data);
-void cmc(unsigned char operation, unsigned short data);
-void stc(unsigned char operation, unsigned short data);
-void jmp(unsigned char operation, unsigned short data);
-void jcon(unsigned char operation, unsigned short data);
-void call(unsigned char operation, unsigned short data);
-void ccall(unsigned char operation, unsigned short data);
-void ret(unsigned char operation, unsigned short data);
-void cret(unsigned char operation, unsigned short data);
-void rst(unsigned char operation, unsigned short data);
-void pchl(unsigned char operation, unsigned short data);
-void push(unsigned char operation, unsigned short data);
-void pushp(unsigned char operation, unsigned short data);
-void pop(unsigned char operation, unsigned short data);
-void popp(unsigned char operation, unsigned short data);
-void xthl(unsigned char operation, unsigned short data);
-void sphl(unsigned char operation, unsigned short data);
-void in(unsigned char operation, unsigned short data);
+void* shift_register_func(void*);
+
+void mov(void);
+void lxi(void);
+void lda(void);
+void sta(void);
+void lhld(void);
+void shld(void);
+void ldax(void);
+void stax(void);
+void xchg(void);
+void add(void);
+void adi(void);
+void adc(void);
+void aci(void);
+void sub(void);
+void sui(void);
+void sbb(void);
+void sbi(void);
+void inr(void);
+void dcr(void);
+void inx(void);
+void dcx(void);
+void dad(void);
+void daa(void);
+void ana(void);
+void ani(void);
+void xra(void);
+void xri(void);
+void ora(void);
+void ori(void);
+void cmp(void);
+void cpi(void);
+void rlc(void);
+void rrc(void);
+void ral(void);
+void rar(void);
+void cma(void);
+void cmc(void);
+void stc(void);
+void jmp(void);
+void jcon(void);
+void call(void);
+void ccall(void);
+void ret(void);
+void cret(void);
+void rst(void);
+void pchl(void);
+void push(void);
+void pushp(void);
+void pop(void);
+void popp(void);
+void xthl(void);
+void sphl(void);
+void in(void);
+void out(void);
+void ei(void);
+void di(void);
+void hlt(void);
+void nop(void);
 
 bool not_zero(void);
 bool zero(void);
@@ -147,6 +167,22 @@ int main(void)
 
 void initialize(void)
 {
+	for (int i = 0; i < NUM_PORTS; i++)
+	{
+		if (sem_init(&sems[i], 0, 1) != 0)
+		{
+			printf("Could not initalize semaphore\n");
+			exit(1);
+		}
+	}
+
+	int value;
+	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
+	{
+		printf("Could not create shift register thread\n");
+		exit(1);
+	}
+
 	condition_checks[0] = &not_zero;
 	condition_checks[1] = &zero;
 	condition_checks[2] = &no_carry;
@@ -310,7 +346,41 @@ void initialize(void)
 	instructions[241] = &popp;
 	instructions[227] = &xthl;
 	instructions[249] = &sphl;
+	instructions[219] = &in;
+	instructions[211] = &out;
+	instructions[251] = &ei;
+	instructions[243] = &di;
+	instructions[118] = &hlt;
+	instructions[0] = &nop;
 }
+
+void* shift_register_func(void*)
+{
+	unsigned short val = 0;
+	while (true)
+	{
+		sem_wait(&sems[4]);
+
+		if (has_been_updated[4])
+		{
+			val >>= 8;
+			val += ports[4] << 8;
+		}
+		
+		sem_post(&sems[4]);
+
+		sem_wait(&sems[2]);
+		sem_wait(&sems[3]);
+
+		ports[3] = val >> (8 - ports[2]);
+
+		sem_post(&sems[2]);
+		sem_post(&sems[3]);
+	}
+}
+
+
+
 
 void update_flags(unsigned char prev, unsigned char post, bool add)
 {
@@ -405,19 +475,19 @@ bool minus(void)
 	return flag & FLAG_S;
 }
 
-void mov(unsigned char operation, unsigned short data)
+void mov(void)
 {
-	if (operation == 118) // HLT
+	if (mem[IP] == 118) // HLT
 	{
 		return;
 	}
 
 	unsigned char src;
-	unsigned char dest = (operation & THREE_TO_FIVE_BITS) >> 3;;
+	unsigned char dest = (mem[IP] & THREE_TO_FIVE_BITS) >> 3;;
 
-	if (operation & (1 << 6))
+	if (mem[IP] & (1 << 6))
 	{
-		src = operation & ZERO_TO_TWO_BITS;
+		src = mem[IP] & ZERO_TO_TWO_BITS;
 
 		if (src == H-L_MEM)
 		{
@@ -427,10 +497,12 @@ void mov(unsigned char operation, unsigned short data)
 		{
 			src = registers[src];
 		}
+		IP++;
 	}
 	else
 	{
-		src = data >> 8;
+		src = mem[IP + 1];
+		IP += 2;
 	}
 
 	if (dest == H-L_MEM)
@@ -443,45 +515,52 @@ void mov(unsigned char operation, unsigned short data)
 	}
 }
 
-void lxi(unsigned char operation, unsigned short data)
+void lxi(void)
 {
-	unsigned short val = (data >> 8) + ((data & 255) << 8);
-	set_rp((operation & 48) >> 4, val);
+	unsigned short val = mem[IP + 1] + (mem[IP + 2] << 8);
+	set_rp((mem[IP] & 48) >> 4, val);
+	IP += 3;
 }
 
-void lda(unsigned char operation, unsigned short data)
+void lda(void)
 {
-	registers[A] = mem[(data << 8) + (data >> 8)];
+	registers[A] = mem[(mem[IP + 2] << 8) + mem[IP + 1]];
+	IP += 3;
 }
 
-void sta(unsigned char operation, unsigned short data)
+void sta(void)
 {
-	mem[(data << 8) + (data >> 8)] = registers[A];
+	mem[(mem[IP + 2] << 8) + mem[IP + 1]] = registers[A];
+	IP += 3;
 }
 
-void lhld(unsigned char operation, unsigned short data)
+void lhld(void)
 {
-	registers[L] = mem[(data << 8) + (data >> 8)];
-	registers[H] = mem[(data << 8) + (data >> 8) + 1];
+	registers[L] = mem[(mem[IP + 2] << 8) + (mem[IP + 1])];
+	registers[H] = mem[(mem[IP + 2] << 8) + (mem[IP + 1]) + 1];
+	IP += 3;
 }
 
-void shld(unsigned char operation, unsigned short data)
+void shld(void)
 {
-	mem[(data << 8) + (data >> 8)] = registers[L];
-	mem[(data << 8) + (data >> 8) + 1] = registers[H];
+	mem[(mem[IP + 2] << 8) + (mem[IP + 1])] = registers[L];
+	mem[(mem[IP + 2] << 8) + (mem[IP + 1]) + 1] = registers[H];
+	IP += 3;
 }
 
-void ldax(unsigned char operation, unsigned short data)
+void ldax(void)
 {
-	registers[A] = mem[get_rp((operation & 48) >> 4)];
+	registers[A] = mem[get_rp((mem[IP] & 48) >> 4)];
+	IP++;
 }
 
-void stax(unsigned char operation, unsigned short data)
+void stax(void)
 {
-	mem[get_rp((operation & 48) >> 4)] = registers[A];
+	mem[get_rp((mem[IP] & 48) >> 4)] = registers[A];
+	IP++;
 }
 
-void xchg(unsigned char operation, unsigned short data)
+void xchg(void)
 {
 	unsigned char tmp = registers[H];
 	registers[H] = registers[D];
@@ -490,162 +569,176 @@ void xchg(unsigned char operation, unsigned short data)
 	tmp = registers[L];
 	registers[L] = registers[E];
 	registers[E] = tmp;
+	IP++;
 }
 
-void add(unsigned char operation, unsigned short data)
+void add(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation & ZERO_TO_TWO_BITS == 6)
+	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
 	{
 		registers[A] += mem[(registers[H] << 8) + registers[L]];
 	}
 	else
 	{
-		registers[A] += registers[operation & ZERO_TO_TWO_BITS];
+		registers[A] += registers[mem[IP] & ZERO_TO_TWO_BITS];
 	}
 
 	update_flags(store, registers[A], true);
+	IP++;
 }
 
-void adi(unsigned char operation, unsigned short data)
+void adi(void)
 {
 	unsigned char store = registers[A];
-	registers[A] += data >> 8;
+	registers[A] += mem[IP + 1];
 	update_flags(store, registers[A], true);
+	IP += 2;
 }
 
-void adc(unsigned char operation, unsigned short data)
+void adc(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation & ZERO_TO_TWO_BITS == 6)
+	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
 	{
 		registers[A] += mem[(registers[H] << 8) + registers[L]] + (flags & FLAG_C);
 	}
 	else
 	{
-		registers[A] += registers[operation & ZERO_TO_TWO_BITS] + (flags & FLAG_C);
+		registers[A] += registers[mem[IP] & ZERO_TO_TWO_BITS] + (flags & FLAG_C);
 	}
 
 	update_flags(store, registers[A], true);
+	IP++;
 }
 
-void aci(unsigned char operation, unsigned short data)
+void aci(void)
 {
 	unsigned char store = registers[A];
-	registers[A] += (data >> 8) + (flags & FLAG_C);
+	registers[A] += (mem[IP + 1]) + (flags & FLAG_C);
 	update_flags(store, registers[A], true);
+	IP += 2;
 }
 
-void sub(unsigned char operation, unsigned short data)
+void sub(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation & ZERO_TO_TWO_BITS == 6)
+	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
 	{
 		registers[A] -= mem[(registers[H] << 8) + registers[L]];
 	}
 	else
 	{
-		registers[A] -= registers[operation & ZERO_TO_TWO_BITS];
+		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS];
 	}
 
 	update_flags(store, registers[A], false);
+	IP++;
 }
 
-void sui(unsigned char operation, unsigned short data)
+void sui(void)
 {
 	unsigned char store = registers[A];
-	registers[A] -= data >> 8;
+	registers[A] -= mem[IP + 1];
 	update_flags(store, registers[A], false);
+	IP += 2;
 }
 
-void sbb(unsigned char operation, unsigned short data)
+void sbb(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation & ZERO_TO_TWO_BITS == 6)
+	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
 	{
 		registers[A] -= mem[(registers[H] << 8) + registers[L]] + FLAG_C;
 	}
 	else
 	{
-		registers[A] -= registers[operation & ZERO_TO_TWO_BITS] + FLAG_C:
+		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS] + FLAG_C:
 	}
 
 	update_flags(store, registers[A], false);
+	IP++;
 }
 
-void sbi(unsigned char operation, unsigned short data)
+void sbi(void)
 {
 	unsigned char store = registers[A];
-	registers[A] -= (data >> 8) + FLAG_C;
+	registers[A] -= (mem[IP + 1]) + FLAG_C;
 	update_flags(store, registers[A], false);
+	IP += 2;
 }
 
-void inr(unsigned char operation, unsigned short data)
+void inr(void)
 {
 	unsigned char store = flags & FLAG_C;
 	
-	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
+	if ((mem[IP] & THREE_TO_FIVE_BITS) >> 3 == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]++;
 		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]], true);
 	}
 	else
 	{
-		registers[(operation & THREE_TO_FIVE_BITS) >> 3]++;
-		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] - 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3], true);
+		registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3]++;
+		update_flags(registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3] - 1, registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3], true);
 	}
 
 	flags |= store;
+	IP++;
 }
 
-void dcr(unsigned char operation, unsigned short data)
+void dcr(void)
 {
 	unsigned char store = flags & FLAG_C;
 
-	if ((operation & THREE_TO_FIVE_BITS) >> 3 == 6)
+	if ((mem[IP] & THREE_TO_FIVE_BITS) >> 3 == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]--;
 		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]], false);
 	}
 	else
 	{
-		registers[(operation & THREE_TO_FIVE_BITS) >> 3]--;
-		update_flags(registers[(operation & THREE_TO_FIVE_BITS) >> 3] + 1, registers[(operation & THREE_TO_FIVE_BITS) >> 3], false);
+		registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3]--;
+		update_flags(registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3] + 1, registers[(mem[IP] & THREE_TO_FIVE_BITS) >> 3], false);
 	}
 
 	flags |= store;
+	IP++;
 }
 
-void inx(unsigned char operation, unsigned short data)
+void inx(void)
 {
-	unsigned short val = get_rp((operation & 48) >> 4);
+	unsigned short val = get_rp((mem[IP] & 48) >> 4);
 	val++;
-	set_rp((operation & 48) >> 4, val);
+	set_rp((mem[IP] & 48) >> 4, val);
+	IP++;
 }
 
-void dcx(unsigned char operation, unsigned short data)
+void dcx(void)
 {
-	unsigned short val = get_rp((operation & 48) >> 4);
+	unsigned short val = get_rp((mem[IP] & 48) >> 4);
 	val--;
-	set_rp((operation & 48) >> 4, val);
+	set_rp((mem[IP] & 48) >> 4, val);
+	IP++;
 }
 
-void dad(unsigned char operation, unsigned short data)
+void dad(void)
 {
 	unsigned short start_value = get_rp(H-L);
-	unsigned short end_value = start_value + get_rp((operation & 48) >> 4);
+	unsigned short end_value = start_value + get_rp((mem[IP] & 48) >> 4);
 	set_rp(H-L, end_value);
 	if (start_value > end_value)
 	{
 		flags |= FLAG_C;
 	}
+	IP++;
 }
 
-void daa(unsigned char operation, unsigned short data)
+void daa(void)
 {
 	unsigned char store = registers[A];
 
@@ -659,103 +752,112 @@ void daa(unsigned char operation, unsigned short data)
 	}
 
 	update_flags(store, registers[A], true);
+	IP++;
 }
 
-void ana(unsigned char operation, unsigned short data)
+void ana(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation == 166)
+	if (mem[IP] == 166)
 	{
 		registers[A] &= mem[get_rp(H-L)];
 	}
 	else
 	{
-		registers[A] &= registers[operation & 7];
+		registers[A] &= registers[mem[IP] & 7];
 	}
 
 	update_flags(store, registers[A], true);
 	flags & (255 - FLAG_C) | FLAG_A;
+	IP++;
 }
 
-void ani(unsigned char operation, unsigned short data)
+void ani(void)
 {
 	unsigned char store = registers[A];
-	registers[A] &= data >> 8;
+	registers[A] &= mem[IP + 1];
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
+	IP += 2;
 }
 
-void xra(unsigned char operation, unsigned short data)
+void xra(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation == 174)
+	if (mem[IP] == 174)
 	{
 		registers[A] ^= mem[get_rp(H-L)];
 	}
 	else
 	{
-		registers[A] ^= registers[operation & 7];
+		registers[A] ^= registers[mem[IP] & 7];
 	}
 
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
+	IP++;
 }
 
-void xri(unsigned char operation, unsigned short data)
+void xri(void)
 {
 	unsigned char store = registers[A];
-	registers[A] ^= data >> 8;
+	registers[A] ^= mem[IP + 1];
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
+	IP += 2;
 }
 
-void ora(unsigned char operation, unsigned short data)
+void ora(void)
 {
 	unsigned char store = registers[A];
 
-	if (operation == 182)
+	if (mem[IP] == 182)
 	{
 		registers[A] |= mem[get_rp(H-L)];
 	}
 	else
 	{
-		registers[A] |= registers[operation & 7];
+		registers[A] |= registers[mem[IP] & 7];
 	}
 
 	update_flags(store, registers[A], true);
 	flags = flags - & (255 - FLAG_C - FLAG_A);
+	IP++;
 }
 
-void ori(unsigned char operation, unsigned short data)
+void ori(void)
 {
 	unsigned char store = registers[A];
-	registers[A] |= data >> 8;
+	registers[A] |= mem[IP + 1];
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
+	IP += 2;
 }
 
-void cmp(unsigned char operation, unsigned short data)
+void cmp(void)
 {
 	unsigned char subtractor;
-	if (operation == 190)
+	if (mem[IP] == 190)
 	{
 		subtractor = mem[get_rp(H-L)];
 	}
 	else
 	{
-		subtractor = registers[operation & 7];
+		subtractor = registers[mem[IP] & 7];
 	}
 	update_flags(registers[A], registers[A] - subtractor);
+	IP++;
 }
 
-void cpi(unsigned char operation, unsigned short data)
+void cpi(void)
 {
-	update_flags(registers[A], registers[A] - (data >> 8));
+	update_flags(registers[A], registers[A] - (mem[IP + 1]));
+	IP += 2;
 }
 
-void rlc(unsigned char operation, unsigned short data)
+void rlc(void)
 {
 	unsigned char num = registers[A] >> 7;
 	registers[A] <<= 1;
@@ -768,9 +870,10 @@ void rlc(unsigned char operation, unsigned short data)
 	{
 		flags &= 255 - FLAG_C;
 	}
+	IP++;
 }
 
-void rrc(unsigned char operation, unsigned short data)
+void rrc(void)
 {
 	unsigned char num = registers[A] << 7;
 	regsters[A] >>= 1;
@@ -783,9 +886,10 @@ void rrc(unsigned char operation, unsigned short data)
 	{
 		flags &= 255 - FLAG_C;
 	}
+	IP++;
 }
 
-void ral(unsigned char operation, unsigned short data)
+void ral(void)
 {
 	unsigned char store = 0;
 	if (flags & FLAG_C)
@@ -804,8 +908,10 @@ void ral(unsigned char operation, unsigned short data)
 
 	registers[A] <<= 1;
 	registers[A] = store | (registers[A] & 1);
+	IP++;
+}
 
-void rar(unsigned char operation, unsigned short data)
+void rar(void)
 {
 	unsigned char store = 0;
 	if (flags & FLAG_C)
@@ -824,94 +930,111 @@ void rar(unsigned char operation, unsigned short data)
 
 	registers[A] >>= 1;
 	registers[A] = store | (regsiters[A] & 127);
+	IP++;
 }
 
-void cma(unsigned char operation, unsigned short data)
+void cma(void)
 {
 	registers[A] = ~registers[A];
+	IP++;
 }
 
-void cmc(unsigned char operation, unsigned short data)
+void cmc(void)
 {
 	flags ^= FLAG_C;
+	IP++;
 }
 
-void stc(unsigned char operation, unsigned short data)
+void stc(void)
 {
 	flags |= FLAG_C;
+	IP++;
 }
 
-void jmp(unsigned char operation, unsigned short data)
+void jmp(void)
 {
-	IP = (data << 8) + (data >> 8);
+	IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
 }
 
-void jcon(unsigned char operation, unsigned short data)
+void jcon(void)
 {
-	if (condition_checks[(operation & 56) >> 3])
+	if (condition_checks[(mem[IP] & 56) >> 3])
 	{
-		IP = (data << 8) + (data >> 8);
+		IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
+	}
+	else
+	{
+		IP += 3;
 	}
 }
 
-void call(unsigned char operation, unsigned short data)
+void call(void)
 {
 	mem[SP - 1] = IP >> 8;
 	mem[SP - 2] = IP & 255;
 	SP -= 2;
-	IP = (data << 8) + (data >> 8);
+	IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
 }
 
-void ccall(unsigned char operation, unsigned short data)
+void ccall(void)
 {
-	if (condition_checks[(operation & 56) >> 3])
+	if (condition_checks[(mem[IP] & 56) >> 3])
 	{
 		mem[SP - 1] = IP >> 8;
 		mem[SP - 2] = IP & 255;
 		SP -= 2;
-		IP = (data << 8) + (data >> 8);
+		IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
+	}
+	else
+	{
+		IP += 3;
 	}
 }
 
-void ret(unsigned char operation, unsigned short data)
+void ret(void)
 {
 	IP = 0;
 	IP += mem[SP] + (mem[SP + 1] << 8);
 	SP += 2;
 }
 
-void cret(unsigned char operation, unsigned short data)
+void cret(void)
 {
-	if (condition_checks[(operation & 56) >> 3])
+	if (condition_checks[(mem[IP] & 56) >> 3])
 	{
 		IP = 0;
 		IP += mem[SP] + (mem[SP + 1] << 8);
 		SP += 2;
 	}
+	else
+	{
+		IP++;
+	}
 }
 
-void rst(unsigned char operation, unsigned short data)
+void rst(void)
 {
 	mem[SP - 1] = IP >> 8;
 	mem[SP - 2] = IP & 255;
 	SP -= 2;
-	IP = operation & 56;
+	IP = mem[IP] & 56;
 }
 
-void pchl(unsigned char operation, unsigned short data)
+void pchl(void)
 {
 	IP = H << 8;
 	IP += L;
 }
 
-void push(unsigned char operation, unsigned short data)
+void push(void)
 {
-	mem[SP - 1] = registers[register_pairs[(operation & 48) >> 4] >> 3];
-	mem[SP - 2] = registers[register_pairs[(operation & 48) >> 4] & 7];
+	mem[SP - 1] = registers[register_pairs[(mem[IP] & 48) >> 4] >> 3];
+	mem[SP - 2] = registers[register_pairs[(mem[IP] & 48) >> 4] & 7];
 	SP -= 2;
+	IP++;
 }
 
-void pushp(unsigned char operation, unsigned short data)
+void pushp(void)
 {
 	mem[SP - 1] = registers[A];
 	int val = 2;
@@ -922,16 +1045,18 @@ void pushp(unsigned char operation, unsigned short data)
 	val += (flags & FLAG_S) << 6;
 	mem[SP - 2] = val;
 	SP -= 2;
+	IP++;
 }
 
-void pop(unsigned char operation, unsigned short data)
+void pop(void)
 {
-	registers[register_pairs[(operation & 48) >> 4] >> 3] = mem[SP - 1];
-	registers[register_pairs[(operation & 48) >> 4] & 7] = mem[SP - 2];
+	registers[register_pairs[(mem[IP] & 48) >> 4] >> 3] = mem[SP - 1];
+	registers[register_pairs[(mem[IP] & 48) >> 4] & 7] = mem[SP - 2];
 	SP += 2;
+	IP++;
 }
 
-void popp(unsigned char operation, unsigned short data)
+void popp(void)
 {
 	flags = 0;
 	flags += (mem[SP] & 1) << FLAG_C_BIT;
@@ -941,9 +1066,10 @@ void popp(unsigned char operation, unsigned short data)
 	flags += (mem[SP] & 128) >> 6;
 	registers[A] = mem[SP + 1];
 	SP += 2;
+	IP++;
 }
 
-void xthl(unsigned char operation, unsigned short data)
+void xthl(void)
 {
 	unsigned char temp;
 	temp = registers[L];
@@ -952,14 +1078,47 @@ void xthl(unsigned char operation, unsigned short data)
 	temp = registers[H];
 	registers[H] = mem[SP + 1];
 	mem[SP + 1] = temp;
+	IP++;
 }
 
-void sphl(unsigned char operation, unsigned short data)
+void sphl(void)
 {
 	SP = (registers[H] << 8) + registers[L];
+	IP++;
 }
 
-void in(unsigned char operation, unsigned short data)
+void in(void)
 {
+	sem_wait(&sems[mem[IP + 1]]);
+	registers[A] = ports[mem[IP + 1]];
+	sem_post(&sems[mem[IP + 1]]);
+	IP += 2;
+}
 
+void out(void)
+{
+	sem_wait(*sems[mem[IP + 1]]);
+	ports[mem[IP + 1]] = registers[A];
+	sem_post(&sems[mem[IP + 1]]);
+	IP += 2;
+}
+
+void ei(void)
+{
+	can_interrupt = true;
+}
+
+void di(void)
+{
+	can_interrupt = false;
+}
+
+void hlt(void)
+{
+	printf("Halted\n");
+}
+
+void nop(void)
+{
+	return;
 }
