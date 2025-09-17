@@ -157,6 +157,7 @@ void ei(void);
 void di(void);
 void hlt(void);
 void nop(void);
+void invalid(void);
 
 bool not_zero(void);
 bool zero(void);
@@ -338,11 +339,17 @@ void initialize(void)
 
 	// these include some instructions that shouldn't be mov but they'll get overwritten later
 	// in the function
+	
+	for (int i = 0; i < 256; i++)
+	{
+		instructions[i] = &invalid;
+	}
+
 	for (int i = 64; i < 128; i++)
 	{
 		instructions[i] = &mov;
 	}
-	for (int i = 6; i < 63; i++)
+	for (int i = 6; i < 63; i += 8)
 	{
 		instructions[i] = &mov;
 	}
@@ -510,6 +517,8 @@ void* emulated_cpu_func(void*)
 	int num_executions = 0;
 	while (true)
 	{
+		printf("DE: %d\n", get_rp(DE));
+		printf("HL: %d\n", get_rp(HL));
 		printf("Exec num: %d\n", num_executions);
 		printf("Instruction: %d\n", mem[IP]);
 		printf("Program Counter: %d\n\n", IP);
@@ -595,15 +604,29 @@ void update_flags(unsigned char prev, unsigned char post, bool add)
 unsigned short get_rp(unsigned char rp_index)
 {
 	unsigned short r = 0;
-	r += registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] << 8;
-	r += registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)];
+	if (rp_index == 3)
+	{
+		r = SP;
+	}
+	else
+	{
+		r += registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] << 8;
+		r += registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)];
+	}
 	return r;
 }
 
 void set_rp(unsigned char rp_index, unsigned short val)
 {
-	registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] = val >> 8;
-	registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)] = val;
+	if (rp_index == 3)
+	{
+		SP = val;
+	}
+	else
+	{
+		registers[(register_pairs[rp_index] & THREE_TO_FIVE_BITS) >> 3] = val >> 8;
+		registers[(register_pairs[rp_index] & ZERO_TO_TWO_BITS)] = val;
+	}
 }
 
 bool not_zero(void)
@@ -654,7 +677,7 @@ void mov(void)
 	}
 
 	unsigned char src;
-	unsigned char dest = (mem[IP] & THREE_TO_FIVE_BITS) >> 3;;
+	unsigned char dest = (mem[IP] & THREE_TO_FIVE_BITS) >> 3;
 
 	if (mem[IP] & (1 << 6))
 	{
@@ -662,7 +685,7 @@ void mov(void)
 
 		if (src == HL_MEM)
 		{
-			src = mem[registers[H] << 8 + registers[L]];
+			src = mem[get_rp(HL)];
 		}
 		else
 		{
@@ -678,7 +701,7 @@ void mov(void)
 
 	if (dest == HL_MEM)
 	{
-		mem[registers[H] << 8 + registers[L]] = src;
+		mem[get_rp(HL)] = src;
 	}
 	else
 	{
@@ -940,7 +963,7 @@ void ana(void)
 	}
 
 	update_flags(store, registers[A], true);
-	flags & (255 - FLAG_C) | FLAG_A;
+	flags &= (255 - FLAG_C);
 	IP++;
 }
 
@@ -1129,7 +1152,7 @@ void jmp(void)
 
 void jcon(void)
 {
-	if (condition_checks[(mem[IP] & 56) >> 3])
+	if ((*condition_checks[(mem[IP] & 56) >> 3])())
 	{
 		IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
 	}
@@ -1141,18 +1164,18 @@ void jcon(void)
 
 void call(void)
 {
-	mem[SP - 1] = IP >> 8;
-	mem[SP - 2] = IP & 255;
+	mem[SP - 1] = (IP + 3) >> 8;
+	mem[SP - 2] = (IP + 3) & 255;
 	SP -= 2;
 	IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
 }
 
 void ccall(void)
 {
-	if (condition_checks[(mem[IP] & 56) >> 3])
+	if ((*condition_checks[(mem[IP] & 56) >> 3])())
 	{
-		mem[SP - 1] = IP >> 8;
-		mem[SP - 2] = IP & 255;
+		mem[SP - 1] = (IP + 3) >> 8;
+		mem[SP - 2] = (IP + 3) & 255;
 		SP -= 2;
 		IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
 	}
@@ -1171,7 +1194,7 @@ void ret(void)
 
 void cret(void)
 {
-	if (condition_checks[(mem[IP] & 56) >> 3])
+	if ((*condition_checks[(mem[IP] & 56) >> 3])())
 	{
 		IP = 0;
 		IP += mem[SP] + (mem[SP + 1] << 8);
@@ -1185,8 +1208,8 @@ void cret(void)
 
 void rst(void)
 {
-	mem[SP - 1] = IP >> 8;
-	mem[SP - 2] = IP & 255;
+	mem[SP - 1] = (IP + 1) >> 8;
+	mem[SP - 2] = (IP + 1) & 255;
 	SP -= 2;
 	IP = mem[IP] & 56;
 }
@@ -1296,4 +1319,10 @@ void hlt(void)
 void nop(void)
 {
 	IP++;
+}
+
+void invalid(void)
+{
+	printf("Invalid instruction!\n");
+	exit(1);
 }

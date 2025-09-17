@@ -1,4 +1,2 @@
-b emulate.c:512
-b emulate.c:174
-b emulate.c:495
-b emulate.c:1291
+b emulate.c:517
+b emulate.c:496
