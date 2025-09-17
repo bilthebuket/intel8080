@@ -3,11 +3,13 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <SDL2/SDL.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #define MEMORY_SIZE 65536
 
-#define NUM_REGISTER_ENCODINGS 8;
-#define NUM_REGISTER_PAIR_ENCODINGS 4;
+#define NUM_REGISTER_ENCODINGS 8
+#define NUM_REGISTER_PAIR_ENCODINGS 3
 
 // indexs of different registers in the registers array
 #define A 7
@@ -17,12 +19,11 @@
 #define E 3
 #define H 4
 #define L 5
-#define H-L_MEM 6
+#define HL_MEM 6
 
-#define B-C 00
-#define D-E 01
-#define H-L 10
-#define S-P 11
+#define BC 0
+#define DE 1
+#define HL 2
 
 // zero, sign, parity, carry, and auxiliary carry flags
 #define FLAG_Z (1) // if the result of an mem[IP] is zero
@@ -53,7 +54,7 @@ typedef void (*instruction)(void);
 typedef bool (*condition_check)(void);
 
 // registers
-unsigned char registers[REGISTER_MAXIMUM_ENCODING_VALUE];
+unsigned char registers[NUM_REGISTER_ENCODINGS];
 
 // each of the elements of the array are a 8 bit int that looks like this:
 // GGHHHLLL
@@ -62,7 +63,7 @@ unsigned char registers[REGISTER_MAXIMUM_ENCODING_VALUE];
 unsigned char register_pairs[NUM_REGISTER_PAIR_ENCODINGS];
 
 unsigned short SP;
-unsigned short IP;
+unsigned short IP = 0;
 
 unsigned char flags = 0;
 
@@ -72,7 +73,12 @@ bool can_interrupt = true;
 
 sem_t sems[NUM_PORTS];
 unsigned char ports[NUM_PORTS];
+
+// bit flag for if a port has been updated
+unsigned char has_been_updated = 0;
 pthread_t shift_register_thread;
+
+pthread_t emulated_cpu_thread;
 
 unsigned short shift_register;
 
@@ -91,6 +97,7 @@ unsigned short get_rp(unsigned char rp_index);
 void set_rp(unsigned char rp_index, unsigned short val);
 
 void* shift_register_func(void*);
+void* emulated_cpu_func(void*);
 
 void mov(void);
 void lxi(void);
@@ -162,7 +169,130 @@ bool minus(void);
 
 int main(void)
 {
-	
+	initialize();
+
+	if (SDL_Init(SDL_INIT_VIDEO) != 0)
+	{
+		printf("SDL init error\n");
+		return 1;
+	}
+
+	SDL_Window* win = SDL_CreateWindow("Space Invaders", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 224, 256, SDL_WINDOW_SHOWN);
+	if (!win)
+	{
+		printf("SDL create window error\n");
+		SDL_Quit();
+		return 1;
+	}
+
+	SDL_Renderer* renderer = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+	if (!renderer)
+	{
+		printf("SDL create renderer error\n");
+		SDL_DestroyWindow(win);
+		SDL_Quit();
+		return 1;
+	}
+
+	int running = 1;
+	SDL_Event event;
+
+	while (running)
+	{
+		while (SDL_PollEvent(&event))
+		{
+			if (event.type == SDL_QUIT)
+			{
+				running = 0;
+			}
+			else if (event.type == SDL_KEYDOWN)
+			{
+				switch (event.key.keysym.sym)
+				{
+					case 'a':
+						sem_wait(&sems[1]);
+						ports[1] |= 1 << 5;
+						sem_post(&sems[1]);
+						break;
+
+					case 'd':
+						sem_wait(&sems[1]);
+						ports[1] |= 1 << 6;
+						sem_post(&sems[1]);
+						break;
+
+					case ' ':
+						sem_wait(&sems[1]);
+						ports[1] |= 1 << 4;
+						sem_post(&sems[1]);
+						break;
+
+					case 'c':
+						sem_wait(&sems[1]);
+						ports[1] |= 1;
+						sem_post(&sems[1]);
+						break;
+				}
+			}
+			else if (event.type == SDL_KEYUP)
+			{
+				switch (event.key.keysym.sym)
+				{
+					case 'a':
+						sem_wait(&sems[1]);
+						ports[1] &= (255 ^ (1 << 5));
+						sem_post(&sems[1]);
+						break;
+
+					case 'd':
+						sem_wait(&sems[1]);
+						ports[1] &= (255 ^ (1 << 6));
+						sem_post(&sems[1]);
+						break;
+
+					case ' ':
+						sem_wait(&sems[1]);
+						ports[1] &= (255 ^ (1 << 4));
+						sem_post(&sems[1]);
+						break;
+
+					case 'c':
+						sem_wait(&sems[1]);
+						ports[1] &= 254;
+						sem_post(&sems[1]);
+						break;
+				}
+			}
+		}
+
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		SDL_RenderClear(renderer);
+
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+		
+		for (int i = 0x2400; i <= 0x3FE0; i += 0x20)
+		{
+			for (int j = i; j <= i + 0x1F; j++)
+			{
+				for (int k = 0; k < 8; k++)
+				{
+					if (mem[j] & (1 << k))
+					{
+						SDL_RenderDrawPoint(renderer, (j - i) * 8 + k, (i - 0x2400) % 0x20);
+					}
+				}
+			}
+		}
+
+		SDL_RenderPresent(renderer);
+		SDL_Delay(16);
+	}
+
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(win);
+	SDL_Quit();
+
+	return 0;
 }
 
 void initialize(void)
@@ -183,6 +313,28 @@ void initialize(void)
 		exit(1);
 	}
 
+	if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
+	{
+		printf("Could not create cpu thread\n");
+		exit(1);
+	}
+
+	int fd = open("invaders/invaders.h", O_RDONLY);
+	read(fd, mem, 2048);
+	close(fd);
+
+	fd = open("invaders/invaders.g", O_RDONLY);
+	read(fd, &mem[2048], 2048);
+	close(fd);
+	
+	fd = open("invaders/invaders.f", O_RDONLY);
+	read(fd, &mem[4096], 2048);
+	close(fd);
+
+	fd = open("invaders/invaders.e", O_RDONLY);
+	read(fd, &mem[6144], 2048);
+	close(fd);
+
 	condition_checks[0] = &not_zero;
 	condition_checks[1] = &zero;
 	condition_checks[2] = &no_carry;
@@ -192,10 +344,9 @@ void initialize(void)
 	condition_checks[6] = &plus;
 	condition_checks[7] = &minus;
 
-	register_pairs[B-C] = (B << 3) + C;
-	register_pairs[D-E] = (D << 3) + E;
-	register_pairs[H-L] = (H << 3) + L;
-	register_pairs[S-P] = (S << 3) + P;
+	register_pairs[BC] = (B << 3) + C;
+	register_pairs[DE] = (D << 3) + E;
+	register_pairs[HL] = (H << 3) + L;
 
 	// these include some instructions that shouldn't be mov but they'll get overwritten later
 	// in the function
@@ -216,10 +367,10 @@ void initialize(void)
 	instructions[58] = &lda;
 	instructions[50] = &sta;
 	instructions[42] = &lhld;
-	instructions[10 + (B-C << 4)] = &ldax;
-	instructions[10 + (D-E << 4)] = &ldax;
-	instructions[2 + (B-C << 4)] = &stax;
-	instructions[2 + (D-E << 4)] = &stax;
+	instructions[10 + (BC << 4)] = &ldax;
+	instructions[10 + (DE << 4)] = &ldax;
+	instructions[2 + (BC << 4)] = &stax;
+	instructions[2 + (DE << 4)] = &stax;
 	instructions[235] = &xchg;
 
 	for (int i = 128; i < 136; i++)
@@ -243,7 +394,7 @@ void initialize(void)
 
 	instructions[214] = &sui;
 
-	for (int i = 152 i < 160; i++)
+	for (int i = 152; i < 160; i++)
 	{
 		instructions[i] = &sbb;
 	}
@@ -354,6 +505,16 @@ void initialize(void)
 	instructions[0] = &nop;
 }
 
+void* emulated_cpu_func(void*)
+{
+	while (true)
+	{
+		(*instructions[mem[IP]])();
+	}
+
+	return NULL;
+}
+
 void* shift_register_func(void*)
 {
 	unsigned short val = 0;
@@ -361,10 +522,11 @@ void* shift_register_func(void*)
 	{
 		sem_wait(&sems[4]);
 
-		if (has_been_updated[4])
+		if (has_been_updated & (1 << 4))
 		{
 			val >>= 8;
 			val += ports[4] << 8;
+			has_been_updated ^= 1 << 4;
 		}
 		
 		sem_post(&sems[4]);
@@ -372,11 +534,13 @@ void* shift_register_func(void*)
 		sem_wait(&sems[2]);
 		sem_wait(&sems[3]);
 
-		ports[3] = val >> (8 - ports[2]);
+		ports[3] = val >> (8 - (ports[2] & 7));
 
 		sem_post(&sems[2]);
 		sem_post(&sems[3]);
 	}
+
+	return NULL;
 }
 
 
@@ -437,42 +601,42 @@ void set_rp(unsigned char rp_index, unsigned short val)
 
 bool not_zero(void)
 {
-	return !(flag & FLAG_Z);
+	return !(flags & FLAG_Z);
 }
 
 bool zero(void)
 {
-	return flag & FLAG_Z;
+	return flags & FLAG_Z;
 }
 
 bool no_carry(void)
 {
-	return !(flag & FLAG_C);
+	return !(flags & FLAG_C);
 }
 
 bool carry(void)
 {
-	return flag & FLAG_C;
+	return flags & FLAG_C;
 }
 
 bool parity_odd(void)
 {
-	return !(flag & FLAG_P);
+	return !(flags & FLAG_P);
 }
 
 bool parity_even(void)
 {
-	return flag & FLAG_P;
+	return flags & FLAG_P;
 }
 
 bool plus(void)
 {
-	return !(flag & FLAG_S);
+	return !(flags & FLAG_S);
 }
 
 bool minus(void)
 {
-	return flag & FLAG_S;
+	return flags & FLAG_S;
 }
 
 void mov(void)
@@ -489,7 +653,7 @@ void mov(void)
 	{
 		src = mem[IP] & ZERO_TO_TWO_BITS;
 
-		if (src == H-L_MEM)
+		if (src == HL_MEM)
 		{
 			src = mem[registers[H] << 8 + registers[L]];
 		}
@@ -505,7 +669,7 @@ void mov(void)
 		IP += 2;
 	}
 
-	if (dest == H-L_MEM)
+	if (dest == HL_MEM)
 	{
 		mem[registers[H] << 8 + registers[L]] = src;
 	}
@@ -657,7 +821,7 @@ void sbb(void)
 	}
 	else
 	{
-		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS] + FLAG_C:
+		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS] + FLAG_C;
 	}
 
 	update_flags(store, registers[A], false);
@@ -728,9 +892,9 @@ void dcx(void)
 
 void dad(void)
 {
-	unsigned short start_value = get_rp(H-L);
+	unsigned short start_value = get_rp(HL);
 	unsigned short end_value = start_value + get_rp((mem[IP] & 48) >> 4);
-	set_rp(H-L, end_value);
+	set_rp(HL, end_value);
 	if (start_value > end_value)
 	{
 		flags |= FLAG_C;
@@ -761,7 +925,7 @@ void ana(void)
 
 	if (mem[IP] == 166)
 	{
-		registers[A] &= mem[get_rp(H-L)];
+		registers[A] &= mem[get_rp(HL)];
 	}
 	else
 	{
@@ -788,7 +952,7 @@ void xra(void)
 
 	if (mem[IP] == 174)
 	{
-		registers[A] ^= mem[get_rp(H-L)];
+		registers[A] ^= mem[get_rp(HL)];
 	}
 	else
 	{
@@ -815,7 +979,7 @@ void ora(void)
 
 	if (mem[IP] == 182)
 	{
-		registers[A] |= mem[get_rp(H-L)];
+		registers[A] |= mem[get_rp(HL)];
 	}
 	else
 	{
@@ -823,7 +987,7 @@ void ora(void)
 	}
 
 	update_flags(store, registers[A], true);
-	flags = flags - & (255 - FLAG_C - FLAG_A);
+	flags = flags & (255 - FLAG_C - FLAG_A);
 	IP++;
 }
 
@@ -841,19 +1005,19 @@ void cmp(void)
 	unsigned char subtractor;
 	if (mem[IP] == 190)
 	{
-		subtractor = mem[get_rp(H-L)];
+		subtractor = mem[get_rp(HL)];
 	}
 	else
 	{
 		subtractor = registers[mem[IP] & 7];
 	}
-	update_flags(registers[A], registers[A] - subtractor);
+	update_flags(registers[A], registers[A] - subtractor, false);
 	IP++;
 }
 
 void cpi(void)
 {
-	update_flags(registers[A], registers[A] - (mem[IP + 1]));
+	update_flags(registers[A], registers[A] - (mem[IP + 1]), false);
 	IP += 2;
 }
 
@@ -876,7 +1040,7 @@ void rlc(void)
 void rrc(void)
 {
 	unsigned char num = registers[A] << 7;
-	regsters[A] >>= 1;
+	registers[A] >>= 1;
 	registers[A] |= num;
 	if (num)
 	{
@@ -929,7 +1093,7 @@ void rar(void)
 	}
 
 	registers[A] >>= 1;
-	registers[A] = store | (regsiters[A] & 127);
+	registers[A] = store | (registers[A] & 127);
 	IP++;
 }
 
@@ -1097,8 +1261,9 @@ void in(void)
 
 void out(void)
 {
-	sem_wait(*sems[mem[IP + 1]]);
+	sem_wait(&sems[mem[IP + 1]]);
 	ports[mem[IP + 1]] = registers[A];
+	has_been_updated |= 1 << 4;
 	sem_post(&sems[mem[IP + 1]]);
 	IP += 2;
 }
