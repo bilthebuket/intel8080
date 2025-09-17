@@ -306,21 +306,8 @@ void initialize(void)
 		}
 	}
 
-	int value;
-	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
-	{
-		printf("Could not create shift register thread\n");
-		exit(1);
-	}
-
-	if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
-	{
-		printf("Could not create cpu thread\n");
-		exit(1);
-	}
-
 	int fd = open("invaders/invaders.h", O_RDONLY);
-	read(fd, mem, 2048);
+	read(fd, &mem[0], 2048);
 	close(fd);
 
 	fd = open("invaders/invaders.g", O_RDONLY);
@@ -334,6 +321,7 @@ void initialize(void)
 	fd = open("invaders/invaders.e", O_RDONLY);
 	read(fd, &mem[6144], 2048);
 	close(fd);
+	int value;
 
 	condition_checks[0] = &not_zero;
 	condition_checks[1] = &zero;
@@ -503,13 +491,32 @@ void initialize(void)
 	instructions[243] = &di;
 	instructions[118] = &hlt;
 	instructions[0] = &nop;
+
+	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
+	{
+		printf("Could not create shift register thread\n");
+		exit(1);
+	}
+
+	if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
+	{
+		printf("Could not create cpu thread\n");
+		exit(1);
+	}
 }
 
 void* emulated_cpu_func(void*)
 {
+	int num_executions = 0;
 	while (true)
 	{
+		printf("Exec num: %d\n", num_executions);
+		printf("Instruction: %d\n", mem[IP]);
+		printf("Program Counter: %d\n\n", IP);
+		fflush(stdout);
 		(*instructions[mem[IP]])();
+		num_executions++;
+
 	}
 
 	return NULL;
@@ -1271,19 +1278,22 @@ void out(void)
 void ei(void)
 {
 	can_interrupt = true;
+	IP++;
 }
 
 void di(void)
 {
 	can_interrupt = false;
+	IP++;
 }
 
 void hlt(void)
 {
 	printf("Halted\n");
+	IP++;
 }
 
 void nop(void)
 {
-	return;
+	IP++;
 }
