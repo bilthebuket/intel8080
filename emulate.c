@@ -38,7 +38,7 @@
 #define FLAG_C_BIT 3
 #define FLAG_A_BIT 4
 
-#define NUM_INSTRUCTIONS 255
+#define NUM_INSTRUCTIONS 256
 #define NUM_CONDITIONS 8
 
 #define ZERO_TO_TWO_BITS 7
@@ -98,6 +98,8 @@ void set_rp(unsigned char rp_index, unsigned short val);
 
 void* shift_register_func(void*);
 void* emulated_cpu_func(void*);
+
+void run_tests(void);
 
 void mov(void);
 void lxi(void);
@@ -168,9 +170,15 @@ bool parity_even(void);
 bool plus(void);
 bool minus(void);
 
-int main(void)
+int main(int argc, char* argv)
 {
 	initialize();
+
+	if (argc > 1)
+	{
+		run_tests();
+		return 0;
+	}
 
 	if (SDL_Init(SDL_INIT_VIDEO) != 0)
 	{
@@ -296,6 +304,188 @@ int main(void)
 	return 0;
 }
 
+void run_tests(void)
+{
+	registers[A] = 0;
+	registers[B] = 1;
+	IP = 0;
+	mem[IP] = (1 << 6) + (A << 3) + B;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 1)
+	{
+		printf("Test 1 (mov r1, r2) failed.\n");
+	}
+	else
+	{
+		printf("Test 1 (mov r1, r2) passed.\n");
+	}
+
+	registers[A] = 5;
+	registers[H] = 1;
+	registers[L] = 12;
+	mem[(1 << 8) + 12] = 6;
+	mem[IP] = (1 << 6) + (3 << 1) + (A << 3);
+	(*instructions[mem[IP]])();
+	if (registers[A] != 6)
+	{
+		printf("Test 2 (mov r, M) failed.\n");
+	}
+	else
+	{
+		printf("Test 2 (mov r, M) passed.\n");
+	}
+
+	mem[(1 << 8) + 12] = 2;
+	mem[IP] = (7 << 4) + E;
+	registers[E] = 11;
+	(*instructions[mem[IP]])();
+	if (mem[(1 << 8) + 12] != 11)
+	{
+		printf("Test 3 (mov M, r) failed.\n");
+	}
+	else
+	{
+		printf("Test 3 (mov M, r) passed.\n");
+	}
+
+	registers[C] = 1;
+	mem[IP] = (3 << 1) + (C << 3);
+	mem[IP + 1] = 16;
+	(*instructions[mem[IP]])();
+	if (registers[C] != 16)
+	{
+		printf("Test 4 (mov r, data) failed.\n");
+	}
+	else
+	{
+		printf("Test 4 (mov r, data) passed.\n");
+	}
+
+	registers[H] = 1;
+	registers[L] = 12;
+	mem[(1 << 8) + 12] = 0;
+	mem[IP + 1] = 1;
+	mem[IP] = (3 << 1) + (3 << 4);
+	(*instructions[mem[IP]])();
+	if (mem[(1 << 8) + 12] != 1)
+	{
+		printf("Test 5 (mov M, data) failed.\n");
+	}
+	else
+	{
+		printf("Test 5 (mov M, data) passed.\n");
+	}
+
+	mem[IP + 1] = 19;
+	mem[IP + 2] = 20;
+	mem[IP] = (DE << 4) + 1;
+	registers[D] = 0;
+	registers[E] = 0;
+	(*instructions[mem[IP]])();
+	if (registers[D] != 20 || registers[E] != 19)
+	{
+		printf("Test 6 (lxi rp, data) failed.\n");
+	}
+	else
+	{
+		printf("Test 6 (lxi rp, data) passed.\n");
+	}
+
+	mem[IP] = (7 << 3) + 2;
+	mem[IP + 1] = 132;
+	mem[IP + 2] = 43;
+	mem[(43 << 8) + 132] = 8;
+	registers[A] = 0;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 8)
+	{
+		printf("Test 7 (lda addr) failed. Expected 8 found %d.\n", registers[A]);
+	}
+	else
+	{
+		printf("Test 7 (lda addr) passed.\n");
+	}
+
+	mem[IP] = 50;
+	mem[IP + 1] = 127;
+	mem[IP + 2] = 202;
+	mem[(202 << 8) + 127] = 67;
+	registers[A] = 68;
+	(*instructions[mem[IP]])();
+	if (mem[(202 << 8) + 127] != 68)
+	{
+		printf("Test 8 (sta addr) failed. Expected 68 found %d.\n", mem[(202 << 8) + 127]);
+	}
+	else
+	{
+		printf("Test 8 (sta addr) passed.\n");
+	}
+
+	mem[IP] = 42;
+	mem[IP + 1] = 50;
+	mem[IP + 2] = 89;
+	registers[H] = 12;
+	registers[L] = 13;
+	mem[(89 << 8) + 50] = 14;
+	mem[(89 << 8) + 51] = 15;
+	(*instructions[mem[IP]])();
+	if (registers[H] != 15 || registers[L] != 14)
+	{
+		printf("Test 9 (lhld addr) failed. Expected 15 in register H and 14 in register L, found %d and %d respectively.\n", registers[H], registers[L]);
+	}
+	else
+	{
+		printf("Test 9 (lhld addr) passed.\n");
+	}
+
+	mem[IP] = 34;
+	mem[IP + 1] = 14;
+	mem[IP + 2] = 12;
+	mem[(12 << 8) + 14] = 60;
+	mem[(12 << 8) + 15] = 62;
+	registers[H] = 1;
+	registers[L] = 0;
+	(*instructions[mem[IP]])();
+	if (mem[(12 << 8) + 14] != 0 || mem[(12 << 8) + 15] != 1)
+	{
+		printf("Test 10 (shld addr) failed. Expected 62 in register H and 60 in register L, found %d and %d respectively.\n", registers[H], registers[L]);
+	}
+	else
+	{
+		printf("Test 10 (shld addr) passed.\n");
+	}
+
+	mem[IP] = 10;
+	registers[B] = 49;
+	registers[C] = 12;
+	mem[(registers[B] << 8) + registers[C]] = 9;
+	registers[A] = 1;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 9)
+	{
+		printf("Test 11 (ldax rp) failed. Expected 9 in register A, found %d.\n", registers[A]);
+	}
+	else
+	{
+		printf("Test 11 (ldax rp) passed.\n");
+	}
+
+	mem[IP] = 18;
+	registers[D] = 50;
+	registers[E] = 12;
+	mem[(registers[D] << 8) + registers[E]] = 1;
+	registers[A] = 0;
+	(*instructions[mem[IP]])();
+	if (mem[(registers[D] << 8) + registers[E]] != 0)
+	{
+		printf("Test 12 (stax rp) failed. Expected 0 in memory location %d, found %d.\n", (registers[D] << 8) + registers[E], mem[(registers[D] << 8) + registers[E]]);
+	}
+	else
+	{
+		printf("Test 12 (stax rp) passed.\n");
+	}
+}
+
 void initialize(void)
 {
 	for (int i = 0; i < NUM_PORTS; i++)
@@ -362,6 +552,7 @@ void initialize(void)
 	instructions[58] = &lda;
 	instructions[50] = &sta;
 	instructions[42] = &lhld;
+	instructions[34] = &shld;
 	instructions[10 + (BC << 4)] = &ldax;
 	instructions[10 + (DE << 4)] = &ldax;
 	instructions[2 + (BC << 4)] = &stax;
@@ -499,16 +690,19 @@ void initialize(void)
 	instructions[118] = &hlt;
 	instructions[0] = &nop;
 
-	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
+	if (0)
 	{
-		printf("Could not create shift register thread\n");
-		exit(1);
-	}
+		if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
+		{
+			printf("Could not create shift register thread\n");
+			exit(1);
+		}
 
-	if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
-	{
-		printf("Could not create cpu thread\n");
-		exit(1);
+		if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
+		{
+			printf("Could not create cpu thread\n");
+			exit(1);
+		}
 	}
 }
 
@@ -522,6 +716,11 @@ void* emulated_cpu_func(void*)
 		printf("Exec num: %d\n", num_executions);
 		printf("Instruction: %d\n", mem[IP]);
 		printf("Program Counter: %d\n\n", IP);
+		if (IP >= 9216 && IP <= 16383)
+		{
+			printf("IP has reached somewhere it shouldn't be\n");
+			exit(1);
+		}
 		fflush(stdout);
 		(*instructions[mem[IP]])();
 		num_executions++;
