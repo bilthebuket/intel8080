@@ -1,7 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "instructions.h"
 #include "global.h"
 #include "utils.h"
+#include "thread_funcs.h"
 
 void run_tests(void);
 
@@ -11,8 +16,83 @@ int main(int argc, char* argv[])
 	run_tests();
 }
 
+void print_test_info(void);
+
 void run_tests(void)
 {
+	int value;
+	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
+	{
+		printf("Could not create shift register thread\n");
+		exit(1);
+	}
+
+	ports[2] = 0;
+	ports[3] = 0;
+	ports[4] = 0;
+
+	registers[A] = 4;
+	mem[IP] = 211;
+	mem[IP + 1] = 2;
+	(*instructions[mem[IP]])();
+	if (ports[2] != 4)
+	{
+		printf("Out not working.\n");
+	}
+	else
+	{
+		printf("Out working.\n");
+	}
+
+	registers[A] = 0;
+	mem[IP] = 219;
+	mem[IP + 1] = 2;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 4)
+	{
+		printf("In not working.\n");
+	}
+	else
+	{
+		printf("In working.\n");
+	}
+
+	registers[A] = 0xFF;
+	ports[2] = 4;
+	mem[IP] = 211;
+	mem[IP + 1] = 4;
+	(*instructions[mem[IP]])();
+	mem[IP] = 219;
+	mem[IP + 1] = 3;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 0xF0)
+	{
+		printf("Shift register test 1 failed. Expected %d, found %d.\n", 0xF0, registers[A]);
+	}
+	else
+	{
+		printf("Shift registers test 1 passed.\n");
+	}
+
+	registers[A] = 0xAA;
+	ports[2] = 3;
+	mem[IP] = 211;
+	mem[IP + 1] = 4;
+	(*instructions[mem[IP]])();
+	mem[IP] = 219;
+	mem[IP + 1] = 3;
+	(*instructions[mem[IP]])();
+	if (registers[A] != 87)
+	{
+		printf("Shift register test 2 failed. Expected %d, found %d.\n", 87, registers[A]);
+	}
+	else
+	{
+		printf("Shift register test 2 passed.\n");
+	}
+
+	pthread_cancel(shift_register_thread);
+
 	update_flags(127, 128, true);
 	if (flags != FLAG_S + FLAG_A)
 	{
@@ -358,4 +438,29 @@ void run_tests(void)
 		printf("Test 15 (add m) passed.\n");
 	}
 	IP = 0;
+
+	instructions[5] = &print_test_info;
+
+	int fd = open("testing/TST8080.COM", O_RDONLY);
+	read(fd, &mem[0], 1536);
+	close(fd);
+	
+	emulated_cpu_func(NULL);
+}
+
+void print_test_info(void)
+{
+	if (registers[C] == 2)
+	{
+		printf("%c", registers[E]);
+	}
+	else if (registers[C] == 9)
+	{
+		int addr = (registers[D] << 8) | registers[E];
+		while (mem[addr] != '$')
+		{
+			putchar(mem[addr]);
+			addr++;
+		}
+	}
 }

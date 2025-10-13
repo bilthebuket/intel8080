@@ -155,7 +155,7 @@ void initialize_arrays(void)
 
 	instructions[205] = &call;
 	
-	for (int i = 193; i<= 249; i += 8)
+	for (int i = 196; i<= 252; i += 8)
 	{
 		instructions[i] = &ccall;
 	}

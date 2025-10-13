@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdbool.h>
+
 void update_flags(unsigned char prev, unsigned char post, bool add);
 
 unsigned short get_rp(unsigned char rp_index);

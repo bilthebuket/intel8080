@@ -660,5 +660,5 @@ void nop(void)
 void invalid(void)
 {
 	printf("Invalid instruction!\n");
-	exit(1);
+	IP++;
 }
