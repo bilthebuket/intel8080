@@ -16,8 +16,6 @@ int main(int argc, char* argv[])
 	run_tests();
 }
 
-void print_test_info(void);
-
 void run_tests(void)
 {
 	int value;
@@ -437,30 +435,11 @@ void run_tests(void)
 	{
 		printf("Test 15 (add m) passed.\n");
 	}
-	IP = 0;
-
-	instructions[5] = &print_test_info;
 
 	int fd = open("testing/TST8080.COM", O_RDONLY);
-	read(fd, &mem[0], 1536);
+	read(fd, &mem[256], 1536);
+	IP = 0x100;
 	close(fd);
 	
 	emulated_cpu_func(NULL);
-}
-
-void print_test_info(void)
-{
-	if (registers[C] == 2)
-	{
-		printf("%c", registers[E]);
-	}
-	else if (registers[C] == 9)
-	{
-		int addr = (registers[D] << 8) | registers[E];
-		while (mem[addr] != '$')
-		{
-			putchar(mem[addr]);
-			addr++;
-		}
-	}
 }

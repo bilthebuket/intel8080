@@ -49,7 +49,7 @@ unsigned char registers[NUM_REGISTER_ENCODINGS];
 // and LLL is the index in registers of the lower order register
 unsigned char register_pairs[NUM_REGISTER_PAIR_ENCODINGS];
 
-unsigned short SP;
+unsigned short SP = MEMORY_SIZE - 1;
 unsigned short IP = 0;
 
 unsigned char flags = 0;

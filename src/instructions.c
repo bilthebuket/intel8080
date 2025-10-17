@@ -131,13 +131,13 @@ void adc(void)
 {
 	unsigned char store = registers[A];
 
-	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
+	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
-		registers[A] += mem[(registers[H] << 8) + registers[L]] + (flags & FLAG_C);
+		registers[A] += mem[(registers[H] << 8) + registers[L]] + !(!(flags & FLAG_C));
 	}
 	else
 	{
-		registers[A] += registers[mem[IP] & ZERO_TO_TWO_BITS] + (flags & FLAG_C);
+		registers[A] += registers[mem[IP] & ZERO_TO_TWO_BITS] + !(!(flags & FLAG_C));
 	}
 
 	update_flags(store, registers[A], true);
@@ -147,7 +147,7 @@ void adc(void)
 void aci(void)
 {
 	unsigned char store = registers[A];
-	registers[A] += (mem[IP + 1]) + (flags & FLAG_C);
+	registers[A] += (mem[IP + 1]) + !(!(flags & FLAG_C));
 	update_flags(store, registers[A], true);
 	IP += 2;
 }
@@ -156,7 +156,7 @@ void sub(void)
 {
 	unsigned char store = registers[A];
 
-	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
+	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
 		registers[A] -= mem[(registers[H] << 8) + registers[L]];
 	}
@@ -181,13 +181,13 @@ void sbb(void)
 {
 	unsigned char store = registers[A];
 
-	if (mem[IP] & ZERO_TO_TWO_BITS == 6)
+	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
-		registers[A] -= mem[(registers[H] << 8) + registers[L]] + FLAG_C;
+		registers[A] -= mem[(registers[H] << 8) + registers[L]] + !(!(flags & FLAG_C));
 	}
 	else
 	{
-		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS] + FLAG_C;
+		registers[A] -= registers[mem[IP] & ZERO_TO_TWO_BITS] + !(!(flags & FLAG_C));
 	}
 
 	update_flags(store, registers[A], false);
@@ -197,7 +197,7 @@ void sbb(void)
 void sbi(void)
 {
 	unsigned char store = registers[A];
-	registers[A] -= (mem[IP + 1]) + FLAG_C;
+	registers[A] -= (mem[IP + 1]) + !(!(flags & FLAG_C));
 	update_flags(store, registers[A], false);
 	IP += 2;
 }
@@ -206,7 +206,7 @@ void inr(void)
 {
 	unsigned char store = flags & FLAG_C;
 	
-	if ((mem[IP] & THREE_TO_FIVE_BITS) >> 3 == 6)
+	if (((mem[IP] & THREE_TO_FIVE_BITS) >> 3) == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]++;
 		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]], true);
@@ -225,7 +225,7 @@ void dcr(void)
 {
 	unsigned char store = flags & FLAG_C;
 
-	if ((mem[IP] & THREE_TO_FIVE_BITS) >> 3 == 6)
+	if (((mem[IP] & THREE_TO_FIVE_BITS) >> 3) == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]--;
 		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]], false);
@@ -272,11 +272,11 @@ void daa(void)
 {
 	unsigned char store = registers[A];
 
-	if (registers[A] & 15 > 9 || flags & FLAG_A)
+	if (((registers[A] & 15) > 9) || (flags & FLAG_A))
 	{
 		registers[A] += 6;
 	}
-	if ((registers[A] >> 4) & 15 > 9 || flags & FLAG_C)
+	if ((((registers[A] >> 4) & 15) > 9) || (flags & FLAG_C))
 	{
 		registers[A] += 96;
 	}
