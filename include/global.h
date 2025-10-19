@@ -82,6 +82,7 @@ extern pthread_t emulated_cpu_thread;
 extern unsigned short shift_register;
 
 extern instruction instructions[NUM_INSTRUCTIONS];
+extern const char* names[NUM_INSTRUCTIONS];
 
 extern condition_check condition_checks[NUM_CONDITIONS];
 

@@ -70,5 +70,6 @@ pthread_t emulated_cpu_thread;
 unsigned short shift_register;
 
 instruction instructions[NUM_INSTRUCTIONS];
+const char* names[NUM_INSTRUCTIONS];
 
 condition_check condition_checks[NUM_CONDITIONS];

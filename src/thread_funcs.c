@@ -31,12 +31,30 @@ void* emulated_cpu_func(void*)
 	int num_executions = 0;
 	while (true)
 	{
-		/*
+		printf("Zero Flag: %X\n", flags & FLAG_Z);
+		printf("Sign Flag: %X\n", (flags & FLAG_S) >> 1);
+		printf("Parity Flag: %X\n", (flags & FLAG_P) >> 2);
+		printf("Carry Flag: %X\n", (flags & FLAG_C) >> 3);
+		printf("Auxiliary Carry Flag: %X\n", (flags & FLAG_A) >> 4);
+		printf("A: %X\n", registers[A]);
+		printf("B: %X\n", registers[B]);
+		printf("C: %X\n", registers[C]);
+		printf("D: %X\n", registers[D]);
+		printf("E: %X\n", registers[E]);
+		printf("H: %X\n", registers[H]);
+		printf("L: %X\n", registers[L]);
+		printf("BC: %X\n", get_rp(BC));
 		printf("DE: %X\n", get_rp(DE));
 		printf("HL: %X\n", get_rp(HL));
-		printf("Exec num: %d\n", num_executions);
-		printf("Instruction: %X\n", mem[IP]);
-		printf("Program Counter: %X\n\n", IP);
+		printf("SP: %X\n", SP);
+		printf("{BC}: %X\n", mem[get_rp(BC)]);
+		printf("{DE}: %X\n", mem[get_rp(DE)]);
+		printf("{HL}: %X\n", mem[get_rp(HL)]);
+		printf("{SP}: %X\n", mem[SP]);
+		printf("Program Counter: %X\n", IP);
+		printf("Instruction: %X: %s\n", mem[IP], names[mem[IP]]);
+		printf("Exec num: %d\n\n", num_executions);
+		/*
 		if (IP >= 9216 && IP <= 16383)
 		{
 			printf("IP has reached somewhere it shouldn't be\n");
@@ -52,7 +70,7 @@ void* emulated_cpu_func(void*)
 		{
 			int do_something = 5;
 		}
-		else if (num_executions == 370)
+		else if (num_executions == 583)
 		{
 			(*instructions[mem[IP]])();
 		}

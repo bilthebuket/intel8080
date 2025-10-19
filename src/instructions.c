@@ -391,13 +391,14 @@ void rlc(void)
 {
 	unsigned char num = registers[A] >> 7;
 	registers[A] <<= 1;
-	registers[A] |= num;
 	if (num)
 	{
+		registers[A] |= num;
 		flags |= FLAG_C;
 	}
 	else
 	{
+		registers[A] &= 254;
 		flags &= 255 - FLAG_C;
 	}
 	IP++;
@@ -427,7 +428,7 @@ void ral(void)
 		store = 1;
 	}
 
-	if (registers[A] & 127)
+	if (registers[A] & 128)
 	{
 		flags |= FLAG_C;
 	}
@@ -437,7 +438,7 @@ void ral(void)
 	}
 
 	registers[A] <<= 1;
-	registers[A] = store | (registers[A] & 1);
+	registers[A] = store | (registers[A] & 254);
 	IP++;
 }
 
@@ -580,8 +581,8 @@ void pushp(void)
 
 void pop(void)
 {
-	registers[register_pairs[(mem[IP] & 48) >> 4] >> 3] = mem[SP - 1];
-	registers[register_pairs[(mem[IP] & 48) >> 4] & 7] = mem[SP - 2];
+	registers[register_pairs[(mem[IP] & 48) >> 4] >> 3] = mem[SP + 1];
+	registers[register_pairs[(mem[IP] & 48) >> 4] & 7] = mem[SP];
 	SP += 2;
 	IP++;
 }
