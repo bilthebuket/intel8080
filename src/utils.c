@@ -8,14 +8,9 @@ void initialize_arrays(void)
 {
 	for (int i = 0; i < NUM_PORTS; i++)
 	{
-		if (sem_init(&sems[i][READY_FOR_WRITE], 0, 1) != 0)
+		if (sem_init(&sems[i], 0, 1) != 0)
 		{
 			printf("Could not initialize semaphore\n");
-			exit(1);
-		}
-		if (sem_init(&sems[i][READY_FOR_READ], 0, 0) != 0)
-		{
-			printf("Could not initialize semaphore.\n");
 			exit(1);
 		}
 	}

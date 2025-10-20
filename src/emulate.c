@@ -50,7 +50,7 @@ int main(int argc, char* argv)
 			// i dont think this semaphore implementation is correct
 			// the mutex is fine but i think it might lead to lots of lag when
 			// playing the game, idk though ts dont even work at all rn
-			sem_wait(&sems[1][READY_FOR_WRITE]);
+			sem_wait(&sems[1]);
 
 			if (event.type == SDL_QUIT)
 			{
@@ -98,7 +98,7 @@ int main(int argc, char* argv)
 						break;
 				}
 			}
-			sem_post(&sems[1][READY_FOR_READ]);
+			sem_post(&sems[1]);
 		}
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);

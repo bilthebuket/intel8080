@@ -70,7 +70,7 @@ extern unsigned char mem[MEMORY_SIZE];
 
 extern bool can_interrupt;
 
-extern sem_t sems[NUM_PORTS][2];
+extern sem_t sems[NUM_PORTS];
 extern unsigned char ports[NUM_PORTS];
 
 // bit flag for if a port has been updated

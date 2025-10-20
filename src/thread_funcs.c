@@ -61,16 +61,22 @@ void* emulated_cpu_func(void*)
 			exit(1);
 		}
 		*/
+		// this is for running TST8080.COM
+		/*
 		if (IP == 5)
 		{
 			print_test_info();
 			ret();
 		}
+		else if (instructions[mem[IP]] == &in || instructions[mem[IP]] == &out)
+		{
+			exit(0);
+		}
 		else if (IP == 0x06A0)
 		{
 			int do_something = 5;
 		}
-		else if (num_executions == 583)
+		else if (num_executions == 652)
 		{
 			(*instructions[mem[IP]])();
 		}
@@ -78,6 +84,8 @@ void* emulated_cpu_func(void*)
 		{
 			(*instructions[mem[IP]])();
 		}
+		*/
+		(*instructions[mem[IP]])();
 		fflush(stdout);
 		num_executions++;
 	}
@@ -90,15 +98,15 @@ void* shift_register_func(void*)
 	unsigned short val = 0;
 	while (true)
 	{
-		sem_wait(&sems[4][READY_FOR_READ]);
-		sem_wait(&sems[3][READY_FOR_WRITE]);
+		sem_wait(&sems[4]);
+		sem_wait(&sems[3]);
 
 		val >>= 8;
 		val += ports[4] << 8;
 		ports[3] = val >> (8 - (ports[2] & 7));
 
-		sem_post(&sems[4][READY_FOR_WRITE]);
-		sem_post(&sems[3][READY_FOR_READ]);
+		sem_post(&sems[4]);
+		sem_post(&sems[3]);
 	}
 
 	return NULL;

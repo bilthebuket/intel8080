@@ -58,7 +58,7 @@ unsigned char mem[MEMORY_SIZE];
 
 bool can_interrupt = true;
 
-sem_t sems[NUM_PORTS][2];
+sem_t sems[NUM_PORTS];
 unsigned char ports[NUM_PORTS];
 
 // bit flag for if a port has been updated

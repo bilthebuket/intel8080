@@ -553,8 +553,8 @@ void rst(void)
 
 void pchl(void)
 {
-	IP = H << 8;
-	IP += L;
+	IP = registers[H] << 8;
+	IP += registers[L];
 }
 
 void push(void)
@@ -620,18 +620,18 @@ void sphl(void)
 
 void in(void)
 {
-	sem_wait(&sems[mem[IP + 1]][READY_FOR_READ]);
+	sem_wait(&sems[mem[IP + 1]]);
 	registers[A] = ports[mem[IP + 1]];
-	sem_post(&sems[mem[IP + 1]][READY_FOR_WRITE]);
+	sem_post(&sems[mem[IP + 1]]);
 	IP += 2;
 }
 
 void out(void)
 {
-	sem_wait(&sems[mem[IP + 1]][READY_FOR_WRITE]);
+	sem_wait(&sems[mem[IP + 1]]);
 	ports[mem[IP + 1]] = registers[A];
 	has_been_updated |= 1 << 4;
-	sem_post(&sems[mem[IP + 1]][READY_FOR_READ]);
+	sem_post(&sems[mem[IP + 1]]);
 	IP += 2;
 }
 
