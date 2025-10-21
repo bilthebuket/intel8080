@@ -10,7 +10,7 @@
 #define NUM_REGISTER_PAIR_ENCODINGS 3
 #define NUM_INSTRUCTIONS 256
 #define NUM_CONDITIONS 8
-#define NUM_PORTS 7
+#define NUM_PORTS 8
 
 // a single assembly instruction, where the extern unsigned char is the actual instruction and extern unsigned short
 // contains the subsquent data/memory address
@@ -51,6 +51,7 @@ extern const int THREE_TO_FIVE_BITS;
 
 extern const int READY_FOR_READ;
 extern const int READY_FOR_WRITE;
+extern const int MUTEX;
 
 // registers
 extern unsigned char registers[NUM_REGISTER_ENCODINGS];
@@ -67,6 +68,7 @@ extern unsigned short IP;
 extern unsigned char flags;
 
 extern unsigned char mem[MEMORY_SIZE];
+extern unsigned char rst_addrs[8];
 
 extern bool can_interrupt;
 
@@ -85,5 +87,7 @@ extern instruction instructions[NUM_INSTRUCTIONS];
 extern const char* names[NUM_INSTRUCTIONS];
 
 extern condition_check condition_checks[NUM_CONDITIONS];
+
+extern int num_executions;
 
 #endif

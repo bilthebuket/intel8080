@@ -1,11 +1,5 @@
 #include "global.h"
-
-#define MEMORY_SIZE 65536
-#define NUM_REGISTER_ENCODINGS 8
-#define NUM_REGISTER_PAIR_ENCODINGS 3
-#define NUM_INSTRUCTIONS 256
-#define NUM_CONDITIONS 8
-#define NUM_PORTS 7
+extern unsigned char rst_addrs[8];
 
 // indexs of different registers in the registers array
 const int A = 7;
@@ -39,6 +33,7 @@ const int THREE_TO_FIVE_BITS = 56;
 
 const int READY_FOR_READ = 0;
 const int READY_FOR_WRITE = 1;
+const int MUTEX = 2;
 
 // registers
 unsigned char registers[NUM_REGISTER_ENCODINGS];
@@ -55,6 +50,7 @@ unsigned short IP = 0;
 unsigned char flags = 0;
 
 unsigned char mem[MEMORY_SIZE];
+unsigned char rst_addrs[8];
 
 bool can_interrupt = true;
 
@@ -73,3 +69,5 @@ instruction instructions[NUM_INSTRUCTIONS];
 const char* names[NUM_INSTRUCTIONS];
 
 condition_check condition_checks[NUM_CONDITIONS];
+
+int num_executions = 0;

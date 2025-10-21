@@ -19,4 +19,6 @@ bool minus(void);
 
 void initialize_arrays(void);
 
+void cycle_sleep(int num_cycles);
+
 #endif

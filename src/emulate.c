@@ -42,14 +42,12 @@ int main(int argc, char* argv)
 
 	int running = 1;
 	SDL_Event event;
+	int elapsed_time = SDL_GetTicks();
 
 	while (running)
 	{
 		while (SDL_PollEvent(&event))
 		{
-			// i dont think this semaphore implementation is correct
-			// the mutex is fine but i think it might lead to lots of lag when
-			// playing the game, idk though ts dont even work at all rn
 			sem_wait(&sems[1]);
 
 			if (event.type == SDL_QUIT)
@@ -114,14 +112,32 @@ int main(int argc, char* argv)
 				{
 					if (mem[j] & (1 << k))
 					{
-						SDL_RenderDrawPoint(renderer, (j - i) * 8 + k, (i - 0x2400) % 0x20);
+						int x = (i - 0x2400) / 0x20;
+						int y = (i + 0x1F - j) * 8 + 8 - k;
+						SDL_RenderDrawPoint(renderer, x, y);
 					}
 				}
 			}
+
+			if (i == (0x3FE0 - 0x2400) / 2)
+			{
+				sem_wait(&sems[7]);
+				ports[7] = 1;
+				sem_post(&sems[7]);
+				int time_to_sleep = 8 - SDL_GetTicks() + elapsed_time;
+				SDL_Delay(time_to_sleep);
+				elapsed_time = SDL_GetTicks();
+			}
 		}
 
+		sem_wait(&sems[7]);
+		ports[7] = 2;
+		sem_post(&sems[7]);
+
 		SDL_RenderPresent(renderer);
-		SDL_Delay(16);
+		int time_to_sleep = 8 - SDL_GetTicks() + elapsed_time;
+		SDL_Delay(time_to_sleep);
+		elapsed_time = SDL_GetTicks();
 	}
 
 	SDL_DestroyRenderer(renderer);
@@ -152,11 +168,13 @@ void initialize(void)
 	close(fd);
 	int value;
 
+	/*
 	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
 	{
 		printf("Could not create shift register thread\n");
 		exit(1);
 	}
+	*/
 
 	if (pthread_create(&emulated_cpu_thread, NULL, &emulated_cpu_func, &value) != 0)
 	{

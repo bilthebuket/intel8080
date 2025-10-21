@@ -28,9 +28,39 @@ void print_test_info(void)
 
 void* emulated_cpu_func(void*)
 {
-	int num_executions = 0;
 	while (true)
 	{
+		if (mem[IP] == 118) // HLT
+		{
+			continue;
+		}
+		
+		// checking for hardware interrupt (i'm using port 7 to send hardware interrupts from the screen to the cpu because space invaders didn't use it)
+		if (can_interrupt)
+		{
+			sem_wait(&sems[7]);
+			if (ports[7] == 1)
+			{
+				mem[SP - 1] = (IP + 1) >> 8;
+				mem[SP - 2] = (IP + 1) & 255;
+				SP -= 2;
+				IP = rst_addrs[1];
+				ports[7] = 0;
+				cycle_sleep(3);
+			}
+			else if (ports[7] == 2)
+			{
+				mem[SP - 1] = (IP + 1) >> 8;
+				mem[SP - 2] = (IP + 1) & 255;
+				SP -= 2;
+				IP = rst_addrs[2];
+				ports[7] = 0;
+				cycle_sleep(3);
+			}
+			sem_post(&sems[7]);
+		}
+
+		/*
 		printf("Zero Flag: %X\n", flags & FLAG_Z);
 		printf("Sign Flag: %X\n", (flags & FLAG_S) >> 1);
 		printf("Parity Flag: %X\n", (flags & FLAG_P) >> 2);
@@ -54,7 +84,6 @@ void* emulated_cpu_func(void*)
 		printf("Program Counter: %X\n", IP);
 		printf("Instruction: %X: %s\n", mem[IP], names[mem[IP]]);
 		printf("Exec num: %d\n\n", num_executions);
-		/*
 		if (IP >= 9216 && IP <= 16383)
 		{
 			printf("IP has reached somewhere it shouldn't be\n");
@@ -96,14 +125,26 @@ void* emulated_cpu_func(void*)
 void* shift_register_func(void*)
 {
 	unsigned short val = 0;
+	unsigned char port_4_val = 0;
+	unsigned char port_2_val = 0;
+
 	while (true)
 	{
 		sem_wait(&sems[4]);
 		sem_wait(&sems[3]);
 
-		val >>= 8;
-		val += ports[4] << 8;
-		ports[3] = val >> (8 - (ports[2] & 7));
+		if (ports[4] != port_4_val)
+		{
+			port_4_val = ports[4];
+			val >>= 8;
+			val += ports[4] << 8;
+			ports[3] = val >> (8 - (ports[2] & 7));
+		}
+		if (ports[2] != port_2_val)
+		{
+			port_2_val = ports[2];
+			ports[3] = val >> (8 - (ports[2] & 7));
+		}
 
 		sem_post(&sems[4]);
 		sem_post(&sems[3]);

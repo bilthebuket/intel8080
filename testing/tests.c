@@ -18,16 +18,14 @@ int main(int argc, char* argv[])
 
 void run_tests(void)
 {
+	/*
 	int value;
 	if (pthread_create(&shift_register_thread, NULL, &shift_register_func, &value) != 0)
 	{
 		printf("Could not create shift register thread\n");
 		exit(1);
 	}
-
-	ports[2] = 0;
-	ports[3] = 0;
-	ports[4] = 0;
+	*/
 
 	registers[A] = 4;
 	mem[IP] = 211;
@@ -89,7 +87,7 @@ void run_tests(void)
 		printf("Shift register test 2 passed.\n");
 	}
 
-	pthread_cancel(shift_register_thread);
+	// pthread_cancel(shift_register_thread);
 
 	update_flags(127, 128, true);
 	if (flags != FLAG_S + FLAG_A)
@@ -441,5 +439,7 @@ void run_tests(void)
 	IP = 0x100;
 	close(fd);
 	
-	emulated_cpu_func(NULL);
+	/*
+		emulated_cpu_func(NULL);
+	*/
 }

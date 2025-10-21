@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "utils.h"
 #include "global.h"
 #include "instructions.h"
@@ -27,6 +28,20 @@ void initialize_arrays(void)
 	register_pairs[BC] = (B << 3) + C;
 	register_pairs[DE] = (D << 3) + E;
 	register_pairs[HL] = (H << 3) + L;
+
+	rst_addrs[0] = 0;
+	rst_addrs[1] = 0x8;
+	rst_addrs[2] = 0x10;
+	rst_addrs[3] = 0x18;
+	rst_addrs[4] = 0x20;
+	rst_addrs[5] = 0x28;
+	rst_addrs[6] = 0x30;
+	rst_addrs[7] = 0x38;
+
+	for (int i = 0; i < NUM_PORTS; i++)
+	{
+		ports[i] = 0;
+	}
 
 	for (int i = 0; i < 256; i++)
 	{
@@ -416,4 +431,16 @@ bool plus(void)
 bool minus(void)
 {
 	return flags & FLAG_S;
+}
+
+void cycle_sleep(int num_cycles)
+{
+	static double elapsed_time = 0;
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	elapsed_time += num_cycles * 320 - ts.tv_sec * 1000000000000 - ts.tv_nsec * 1000;
+	while (ts.tv_sec * 1000000000000 + ts.tv_nsec * 1000 < elapsed_time)
+	{
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+	}
 }
