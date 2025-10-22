@@ -21,4 +21,6 @@ void initialize_arrays(void);
 
 void cycle_sleep(int num_cycles);
 
+void print_debug_info(void);
+
 #endif

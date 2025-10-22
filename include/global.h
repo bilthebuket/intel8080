@@ -12,6 +12,8 @@
 #define NUM_CONDITIONS 8
 #define NUM_PORTS 8
 
+#define CYCLES_PER_INTERRUPT 16667
+
 // a single assembly instruction, where the extern unsigned char is the actual instruction and extern unsigned short
 // contains the subsquent data/memory address
 typedef void (*instruction)(void);
@@ -70,7 +72,9 @@ extern unsigned char flags;
 extern unsigned char mem[MEMORY_SIZE];
 extern unsigned char rst_addrs[8];
 
+// this is because interrupts are enabled one instructions after ei is called, not immediatly
 extern bool can_interrupt;
+extern bool actually_can_interrupt;
 
 extern sem_t sems[NUM_PORTS];
 extern unsigned char ports[NUM_PORTS];
@@ -89,5 +93,6 @@ extern const char* names[NUM_INSTRUCTIONS];
 extern condition_check condition_checks[NUM_CONDITIONS];
 
 extern int num_executions;
+extern int num_cycles_executed;
 
 #endif

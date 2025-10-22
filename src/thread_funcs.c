@@ -28,68 +28,89 @@ void print_test_info(void)
 
 void* emulated_cpu_func(void*)
 {
+	int interrupt = 1;
 	while (true)
 	{
+		// print_debug_info();
+
+		// checking for hardware interrupt (i'm using port 7 to send hardware interrupts from the screen to the cpu because space invaders didn't use it)
+		if (can_interrupt)
+		{
+			if (!actually_can_interrupt)
+			{
+				actually_can_interrupt = true;
+			}
+			else
+			{
+				if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
+				{
+					if (interrupt == 1)
+					{
+						mem[SP - 1] = (IP + 1) >> 8;
+						mem[SP - 2] = (IP + 1) & 255;
+						SP -= 2;
+						IP = rst_addrs[1];
+						cycle_sleep(3);
+					}
+					else
+					{
+						mem[SP - 1] = (IP + 1) >> 8;
+						mem[SP - 2] = (IP + 1) & 255;
+						SP -= 2;
+						IP = rst_addrs[2];
+						cycle_sleep(3);
+					}
+				}
+				/*
+				sem_wait(&sems[7]);
+				if (ports[7] == 1)
+				{
+					mem[SP - 1] = (IP + 1) >> 8;
+					mem[SP - 2] = (IP + 1) & 255;
+					SP -= 2;
+					IP = rst_addrs[1];
+					ports[7] = 0;
+					cycle_sleep(3);
+				}
+				else if (ports[7] == 2)
+				{
+					mem[SP - 1] = (IP + 1) >> 8;
+					mem[SP - 2] = (IP + 1) & 255;
+					SP -= 2;
+					IP = rst_addrs[2];
+					ports[7] = 0;
+					cycle_sleep(3);
+				}
+				sem_post(&sems[7]);
+				*/
+			}
+		}
+
+		if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
+		{
+			num_cycles_executed -= CYCLES_PER_INTERRUPT;
+			if (interrupt == 1)
+			{
+				interrupt = 2;
+			}
+			else
+			{
+				interrupt = 1;
+			}
+		}
+
 		if (mem[IP] == 118) // HLT
 		{
 			continue;
 		}
-		
-		// checking for hardware interrupt (i'm using port 7 to send hardware interrupts from the screen to the cpu because space invaders didn't use it)
-		if (can_interrupt)
-		{
-			sem_wait(&sems[7]);
-			if (ports[7] == 1)
-			{
-				mem[SP - 1] = (IP + 1) >> 8;
-				mem[SP - 2] = (IP + 1) & 255;
-				SP -= 2;
-				IP = rst_addrs[1];
-				ports[7] = 0;
-				cycle_sleep(3);
-			}
-			else if (ports[7] == 2)
-			{
-				mem[SP - 1] = (IP + 1) >> 8;
-				mem[SP - 2] = (IP + 1) & 255;
-				SP -= 2;
-				IP = rst_addrs[2];
-				ports[7] = 0;
-				cycle_sleep(3);
-			}
-			sem_post(&sems[7]);
-		}
 
 		/*
-		printf("Zero Flag: %X\n", flags & FLAG_Z);
-		printf("Sign Flag: %X\n", (flags & FLAG_S) >> 1);
-		printf("Parity Flag: %X\n", (flags & FLAG_P) >> 2);
-		printf("Carry Flag: %X\n", (flags & FLAG_C) >> 3);
-		printf("Auxiliary Carry Flag: %X\n", (flags & FLAG_A) >> 4);
-		printf("A: %X\n", registers[A]);
-		printf("B: %X\n", registers[B]);
-		printf("C: %X\n", registers[C]);
-		printf("D: %X\n", registers[D]);
-		printf("E: %X\n", registers[E]);
-		printf("H: %X\n", registers[H]);
-		printf("L: %X\n", registers[L]);
-		printf("BC: %X\n", get_rp(BC));
-		printf("DE: %X\n", get_rp(DE));
-		printf("HL: %X\n", get_rp(HL));
-		printf("SP: %X\n", SP);
-		printf("{BC}: %X\n", mem[get_rp(BC)]);
-		printf("{DE}: %X\n", mem[get_rp(DE)]);
-		printf("{HL}: %X\n", mem[get_rp(HL)]);
-		printf("{SP}: %X\n", mem[SP]);
-		printf("Program Counter: %X\n", IP);
-		printf("Instruction: %X: %s\n", mem[IP], names[mem[IP]]);
-		printf("Exec num: %d\n\n", num_executions);
-		if (IP >= 9216 && IP <= 16383)
+		*/
+		if (IP > 0x1FFF)
 		{
-			printf("IP has reached somewhere it shouldn't be\n");
+			printf("IP has reached somewhere it shouldn't be (%X)\n", IP);
 			exit(1);
 		}
-		*/
 		// this is for running TST8080.COM
 		/*
 		if (IP == 5)

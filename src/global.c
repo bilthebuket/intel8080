@@ -44,7 +44,7 @@ unsigned char registers[NUM_REGISTER_ENCODINGS];
 // and LLL is the index in registers of the lower order register
 unsigned char register_pairs[NUM_REGISTER_PAIR_ENCODINGS];
 
-unsigned short SP = MEMORY_SIZE - 1;
+unsigned short SP = 0x2400;
 unsigned short IP = 0;
 
 unsigned char flags = 0;
@@ -52,7 +52,8 @@ unsigned char flags = 0;
 unsigned char mem[MEMORY_SIZE];
 unsigned char rst_addrs[8];
 
-bool can_interrupt = true;
+bool can_interrupt = false;
+bool actually_can_interrupt = false;
 
 sem_t sems[NUM_PORTS];
 unsigned char ports[NUM_PORTS];
@@ -71,3 +72,4 @@ const char* names[NUM_INSTRUCTIONS];
 condition_check condition_checks[NUM_CONDITIONS];
 
 int num_executions = 0;
+int num_cycles_executed = 0;

@@ -7,6 +7,11 @@
 
 void initialize_arrays(void)
 {
+	for (int i = 0; i < MEMORY_SIZE; i++)
+	{
+		mem[i] = 0;
+	}
+
 	for (int i = 0; i < NUM_PORTS; i++)
 	{
 		if (sem_init(&sems[i], 0, 1) != 0)
@@ -435,12 +440,48 @@ bool minus(void)
 
 void cycle_sleep(int num_cycles)
 {
-	static double elapsed_time = 0;
+	static double time = 0;
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	elapsed_time += num_cycles * 320 - ts.tv_sec * 1000000000000 - ts.tv_nsec * 1000;
-	while (ts.tv_sec * 1000000000000 + ts.tv_nsec * 1000 < elapsed_time)
+
+	if (time == 0)
+	{
+		time = (double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 + (double) num_cycles * 320.0;
+	}
+	else
+	{
+		time += (double) num_cycles * 320.0;
+	}
+	while ((double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 < time)
 	{
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 	}
+	num_cycles_executed += num_cycles;
+}
+
+void print_debug_info(void)
+{
+	printf("Zero Flag: %X\n", flags & FLAG_Z);
+	printf("Sign Flag: %X\n", (flags & FLAG_S) >> 1);
+	printf("Parity Flag: %X\n", (flags & FLAG_P) >> 2);
+	printf("Carry Flag: %X\n", (flags & FLAG_C) >> 3);
+	printf("Auxiliary Carry Flag: %X\n", (flags & FLAG_A) >> 4);
+	printf("A: %X\n", registers[A]);
+	printf("B: %X\n", registers[B]);
+	printf("C: %X\n", registers[C]);
+	printf("D: %X\n", registers[D]);
+	printf("E: %X\n", registers[E]);
+	printf("H: %X\n", registers[H]);
+	printf("L: %X\n", registers[L]);
+	printf("BC: %X\n", get_rp(BC));
+	printf("DE: %X\n", get_rp(DE));
+	printf("HL: %X\n", get_rp(HL));
+	printf("SP: %X\n", SP);
+	printf("{BC}: %X\n", mem[get_rp(BC)]);
+	printf("{DE}: %X\n", mem[get_rp(DE)]);
+	printf("{HL}: %X\n", mem[get_rp(HL)]);
+	printf("{SP}: %X\n", mem[SP]);
+	printf("Program Counter: %X\n", IP);
+	printf("Instruction: %X: %s\n", mem[IP], names[mem[IP]]);
+	printf("Exec num: %d\n\n", num_executions);
 }

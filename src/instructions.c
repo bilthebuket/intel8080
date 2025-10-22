@@ -732,6 +732,7 @@ void ei(void)
 void di(void)
 {
 	can_interrupt = false;
+	actually_can_interrupt = false;
 	IP++;
 	cycle_sleep(1);
 }
