@@ -40,11 +40,13 @@ void* emulated_cpu_func(void*)
 			if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
 			{
 				//printf("Interrupt %d!\n", interrupt);
-
 				if (mem[IP] == 118)
 				{
 					IP++;
 				}
+
+				//printf("Interrupt from: %X to: ", IP);
+
 				if (interrupt == 1)
 				{
 
@@ -52,7 +54,7 @@ void* emulated_cpu_func(void*)
 					mem[SP - 2] = IP & 255;
 					SP -= 2;
 					IP = rst_addrs[1];
-					cycle_sleep(3);
+					cycle_sleep(11);
 				}
 				else
 				{
@@ -60,8 +62,13 @@ void* emulated_cpu_func(void*)
 					mem[SP - 2] = IP & 255;
 					SP -= 2;
 					IP = rst_addrs[2];
-					cycle_sleep(3);
+					cycle_sleep(11);
 				}
+
+				can_interrupt = false;
+				actually_can_interrupt = false;
+
+				//printf("%X\n", IP);
 			}
 			/*
 			sem_wait(&sems[7]);
@@ -102,7 +109,8 @@ void* emulated_cpu_func(void*)
 
 		if (mem[IP] == 118) // HLT
 		{
-			cycle_sleep(1);
+			printf("Halt\n");
+			cycle_sleep(7);
 			continue;
 		}
 
@@ -150,6 +158,7 @@ void* emulated_cpu_func(void*)
 	return NULL;
 }
 
+/*
 void* shift_register_func(void*)
 {
 	unsigned short val = 0;
@@ -180,3 +189,4 @@ void* shift_register_func(void*)
 
 	return NULL;
 }
+*/

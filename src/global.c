@@ -56,7 +56,8 @@ bool can_interrupt = false;
 bool actually_can_interrupt = false;
 
 sem_t sems[NUM_PORTS];
-unsigned char ports[NUM_PORTS];
+unsigned char out_ports[NUM_PORTS];
+unsigned char in_ports[NUM_PORTS];
 
 // bit flag for if a port has been updated
 unsigned char has_been_updated = 0;

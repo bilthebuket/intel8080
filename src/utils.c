@@ -45,7 +45,8 @@ void initialize_arrays(void)
 
 	for (int i = 0; i < NUM_PORTS; i++)
 	{
-		ports[i] = 0;
+		out_ports[i] = 0;
+		in_ports[i] = 0;
 	}
 
 	for (int i = 0; i < 256; i++)
@@ -444,9 +445,9 @@ void cycle_sleep(int num_cycles)
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 
-	time = (double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 + (double) num_cycles * 100000.0;
+	time = (double) ts.tv_sec * 1000000000.0 + (double) ts.tv_nsec + (double) num_cycles * 488;
 
-	while ((double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 < time)
+	while ((double) ts.tv_sec * 1000000000.0 + (double) ts.tv_nsec < time)
 	{
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 	}

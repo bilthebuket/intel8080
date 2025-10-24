@@ -48,7 +48,7 @@ int main(int argc, char* argv)
 	{
 		while (SDL_PollEvent(&event))
 		{
-			sem_wait(&sems[1]);
+			//sem_wait(&sems[1]);
 
 			if (event.type == SDL_QUIT)
 			{
@@ -59,23 +59,27 @@ int main(int argc, char* argv)
 				switch (event.key.keysym.sym)
 				{
 					case 'a':
-						ports[1] |= 1 << 5;
+						in_ports[1] |= 1 << 5;
 						break;
 
 					case 'd':
-						ports[1] |= 1 << 6;
+						in_ports[1] |= 1 << 6;
 						break;
 
 					case ' ':
-						ports[1] |= 1 << 4;
+						in_ports[1] |= 1 << 4;
 						break;
 
 					case 'c':
-						ports[1] |= 1;
+						in_ports[1] |= 1;
 						break;
 
 					case '1':
-						ports[1] |= 1 << 2;
+						in_ports[1] |= 1 << 2;
+						break;
+
+					case 'b':
+						int do_something = 5;
 						break;
 				}
 			}
@@ -84,27 +88,27 @@ int main(int argc, char* argv)
 				switch (event.key.keysym.sym)
 				{
 					case 'a':
-						ports[1] &= (255 ^ (1 << 5));
+						in_ports[1] &= (255 ^ (1 << 5));
 						break;
 
 					case 'd':
-						ports[1] &= (255 ^ (1 << 6));
+						in_ports[1] &= (255 ^ (1 << 6));
 						break;
 
 					case ' ':
-						ports[1] &= (255 ^ (1 << 4));
+						in_ports[1] &= (255 ^ (1 << 4));
 						break;
 
 					case 'c':
-						ports[1] &= 254;
+						in_ports[1] &= 254;
 						break;
 
 					case '1':
-						ports[1] &= (255 ^ (1 << 2));
+						in_ports[1] &= (255 ^ (1 << 2));
 						break;
 				}
 			}
-			sem_post(&sems[1]);
+			//sem_post(&sems[1]);
 		}
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);

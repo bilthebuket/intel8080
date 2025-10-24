@@ -9,7 +9,7 @@ void mov(void)
 {
 	unsigned char src;
 	unsigned char dest = (mem[IP] & THREE_TO_FIVE_BITS) >> 3;
-	int num_cycles = 1;
+	int num_cycles = 5;
 
 	if (mem[IP] & (1 << 6))
 	{
@@ -18,7 +18,7 @@ void mov(void)
 		if (src == HL_MEM)
 		{
 			src = mem[get_rp(HL)];
-			num_cycles++;
+			num_cycles += 2;
 		}
 		else
 		{
@@ -29,14 +29,18 @@ void mov(void)
 	else
 	{
 		src = mem[IP + 1];
-		num_cycles++;
+		num_cycles += 2;
 		IP += 2;
 	}
 
 	if (dest == HL_MEM)
 	{
 		mem[get_rp(HL)] = src;
-		num_cycles++;
+		num_cycles += 2;
+		if (num_cycles == 11)
+		{
+			num_cycles--;
+		}
 	}
 	else
 	{
@@ -51,21 +55,21 @@ void lxi(void)
 	unsigned short val = mem[IP + 1] + (mem[IP + 2] << 8);
 	set_rp((mem[IP] & 48) >> 4, val);
 	IP += 3;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void lda(void)
 {
 	registers[A] = mem[(mem[IP + 2] << 8) + mem[IP + 1]];
 	IP += 3;
-	cycle_sleep(4);
+	cycle_sleep(13);
 }
 
 void sta(void)
 {
 	mem[(mem[IP + 2] << 8) + mem[IP + 1]] = registers[A];
 	IP += 3;
-	cycle_sleep(4);
+	cycle_sleep(13);
 }
 
 void lhld(void)
@@ -73,7 +77,7 @@ void lhld(void)
 	registers[L] = mem[(mem[IP + 2] << 8) + (mem[IP + 1])];
 	registers[H] = mem[(mem[IP + 2] << 8) + (mem[IP + 1]) + 1];
 	IP += 3;
-	cycle_sleep(5);
+	cycle_sleep(16);
 }
 
 void shld(void)
@@ -81,21 +85,21 @@ void shld(void)
 	mem[(mem[IP + 2] << 8) + (mem[IP + 1])] = registers[L];
 	mem[(mem[IP + 2] << 8) + (mem[IP + 1]) + 1] = registers[H];
 	IP += 3;
-	cycle_sleep(5);
+	cycle_sleep(16);
 }
 
 void ldax(void)
 {
 	registers[A] = mem[get_rp((mem[IP] & 48) >> 4)];
 	IP++;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void stax(void)
 {
 	mem[get_rp((mem[IP] & 48) >> 4)] = registers[A];
 	IP++;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void xchg(void)
@@ -108,18 +112,18 @@ void xchg(void)
 	registers[L] = registers[E];
 	registers[E] = tmp;
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void add(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
 		registers[A] += mem[(registers[H] << 8) + registers[L]];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -137,18 +141,18 @@ void adi(void)
 	registers[A] += mem[IP + 1];
 	update_flags(store, registers[A], true);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void adc(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
 		registers[A] += mem[(registers[H] << 8) + registers[L]] + !(!(flags & FLAG_C));
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -166,18 +170,18 @@ void aci(void)
 	registers[A] += (mem[IP + 1]) + !(!(flags & FLAG_C));
 	update_flags(store, registers[A], true);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void sub(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
 		registers[A] -= mem[(registers[H] << 8) + registers[L]];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -195,18 +199,18 @@ void sui(void)
 	registers[A] -= mem[IP + 1];
 	update_flags(store, registers[A], false);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void sbb(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if ((mem[IP] & ZERO_TO_TWO_BITS) == 6)
 	{
 		registers[A] -= mem[(registers[H] << 8) + registers[L]] + !(!(flags & FLAG_C));
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -224,19 +228,19 @@ void sbi(void)
 	registers[A] -= (mem[IP + 1]) + !(!(flags & FLAG_C));
 	update_flags(store, registers[A], false);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void inr(void)
 {
 	unsigned char store = flags & FLAG_C;
-	int num_cycles = 1;
+	int num_cycles = 5;
 	
 	if (((mem[IP] & THREE_TO_FIVE_BITS) >> 3) == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]++;
 		update_flags(mem[(registers[H] << 8) + registers[L]] - 1, mem[(registers[H] << 8) + registers[L]], true);
-		num_cycles += 2;
+		num_cycles += 5;
 	}
 	else
 	{
@@ -252,13 +256,13 @@ void inr(void)
 void dcr(void)
 {
 	unsigned char store = flags & FLAG_C;
-	int num_cycles = 1;
+	int num_cycles = 5;
 
 	if (((mem[IP] & THREE_TO_FIVE_BITS) >> 3) == 6)
 	{
 		mem[(registers[H] << 8) + registers[L]]--;
 		update_flags(mem[(registers[H] << 8) + registers[L]] + 1, mem[(registers[H] << 8) + registers[L]], false);
-		num_cycles += 2;
+		num_cycles += 5;
 	}
 	else
 	{
@@ -277,7 +281,7 @@ void inx(void)
 	val++;
 	set_rp((mem[IP] & 48) >> 4, val);
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(5);
 }
 
 void dcx(void)
@@ -286,7 +290,7 @@ void dcx(void)
 	val--;
 	set_rp((mem[IP] & 48) >> 4, val);
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(5);
 }
 
 void dad(void)
@@ -299,7 +303,7 @@ void dad(void)
 		flags |= FLAG_C;
 	}
 	IP++;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void daa(void)
@@ -317,18 +321,18 @@ void daa(void)
 
 	update_flags(store, registers[A], true);
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void ana(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if (mem[IP] == 166)
 	{
 		registers[A] &= mem[get_rp(HL)];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -348,18 +352,18 @@ void ani(void)
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void xra(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if (mem[IP] == 174)
 	{
 		registers[A] ^= mem[get_rp(HL)];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -379,18 +383,18 @@ void xri(void)
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void ora(void)
 {
 	unsigned char store = registers[A];
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if (mem[IP] == 182)
 	{
 		registers[A] |= mem[get_rp(HL)];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -410,18 +414,18 @@ void ori(void)
 	update_flags(store, registers[A], true);
 	flags = flags & (255 - FLAG_C - FLAG_A);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void cmp(void)
 {
 	unsigned char subtractor;
-	int num_cycles = 1;
+	int num_cycles = 4;
 
 	if (mem[IP] == 190)
 	{
 		subtractor = mem[get_rp(HL)];
-		num_cycles++;
+		num_cycles += 3;
 	}
 	else
 	{
@@ -436,7 +440,7 @@ void cpi(void)
 {
 	update_flags(registers[A], registers[A] - (mem[IP + 1]), false);
 	IP += 2;
-	cycle_sleep(2);
+	cycle_sleep(7);
 }
 
 void rlc(void)
@@ -454,7 +458,7 @@ void rlc(void)
 		flags &= 255 - FLAG_C;
 	}
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void rrc(void)
@@ -471,7 +475,7 @@ void rrc(void)
 		flags &= 255 - FLAG_C;
 	}
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void ral(void)
@@ -494,7 +498,7 @@ void ral(void)
 	registers[A] <<= 1;
 	registers[A] = store | (registers[A] & 254);
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void rar(void)
@@ -517,34 +521,34 @@ void rar(void)
 	registers[A] >>= 1;
 	registers[A] = store | (registers[A] & 127);
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void cma(void)
 {
 	registers[A] = ~registers[A];
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void cmc(void)
 {
 	flags ^= FLAG_C;
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void stc(void)
 {
 	flags |= FLAG_C;
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void jmp(void)
 {
 	IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void jcon(void)
@@ -557,56 +561,64 @@ void jcon(void)
 	{
 		IP += 3;
 	}
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void call(void)
 {
+	//printf("%X: ", IP);
 	mem[SP - 1] = (IP + 3) >> 8;
 	mem[SP - 2] = (IP + 3) & 255;
 	SP -= 2;
 	IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
-	cycle_sleep(5);
+	//printf("Call to %X\n", IP);
+	cycle_sleep(17);
 }
 
 void ccall(void)
 {
 	if ((*condition_checks[(mem[IP] & 56) >> 3])())
 	{
+		//printf("%X: ", IP);
 		mem[SP - 1] = (IP + 3) >> 8;
 		mem[SP - 2] = (IP + 3) & 255;
 		SP -= 2;
 		IP = (mem[IP + 2] << 8) + (mem[IP + 1]);
-		cycle_sleep(5);
+		//printf("Call to %X\n", IP);
+		cycle_sleep(17);
 	}
 	else
 	{
 		IP += 3;
-		cycle_sleep(3);
+		cycle_sleep(11);
 	}
 }
 
 void ret(void)
 {
+	//printf("%X: ", IP);
 	IP = 0;
 	IP += mem[SP] + (mem[SP + 1] << 8);
 	SP += 2;
-	cycle_sleep(3);
+	//printf("Return to %X\n", IP);
+	cycle_sleep(10);
 }
 
 void cret(void)
 {
 	if ((*condition_checks[(mem[IP] & 56) >> 3])())
 	{
+		//printf("%X: ", IP);
 		IP = 0;
 		IP += mem[SP] + (mem[SP + 1] << 8);
 		SP += 2;
-		cycle_sleep(3);
+		//printf("Return to %X\n", IP);
+		cycle_sleep(11);
 	}
 	else
 	{
 		IP++;
-		cycle_sleep(1);
+		cycle_sleep(5);
 	}
 }
 
@@ -616,14 +628,14 @@ void rst(void)
 	mem[SP - 2] = (IP + 1) & 255;
 	SP -= 2;
 	IP = rst_addrs[(mem[IP] & 56) >> 3];
-	cycle_sleep(3);
+	cycle_sleep(11);
 }
 
 void pchl(void)
 {
 	IP = registers[H] << 8;
 	IP += registers[L];
-	cycle_sleep(1);
+	cycle_sleep(5);
 }
 
 void push(void)
@@ -632,7 +644,7 @@ void push(void)
 	mem[SP - 2] = registers[register_pairs[(mem[IP] & 48) >> 4] & 7];
 	SP -= 2;
 	IP++;
-	cycle_sleep(3);
+	cycle_sleep(11);
 }
 
 void pushp(void)
@@ -647,7 +659,7 @@ void pushp(void)
 	mem[SP - 2] = val;
 	SP -= 2;
 	IP++;
-	cycle_sleep(3);
+	cycle_sleep(11);
 }
 
 void pop(void)
@@ -656,7 +668,7 @@ void pop(void)
 	registers[register_pairs[(mem[IP] & 48) >> 4] & 7] = mem[SP];
 	SP += 2;
 	IP++;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void popp(void)
@@ -670,7 +682,7 @@ void popp(void)
 	registers[A] = mem[SP + 1];
 	SP += 2;
 	IP++;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void xthl(void)
@@ -683,50 +695,50 @@ void xthl(void)
 	registers[H] = mem[SP + 1];
 	mem[SP + 1] = temp;
 	IP++;
-	cycle_sleep(5);
+	cycle_sleep(18);
 }
 
 void sphl(void)
 {
 	SP = (registers[H] << 8) + registers[L];
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(5);
 }
 
 void in(void)
 {
-	sem_wait(&sems[mem[IP + 1]]);
-	registers[A] = ports[mem[IP + 1]];
-	sem_post(&sems[mem[IP + 1]]);
+	//sem_wait(&sems[mem[IP + 1]]);
+	registers[A] = in_ports[mem[IP + 1]];
+	//sem_post(&sems[mem[IP + 1]]);
 	IP += 2;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void out(void)
 {
 	static int val = 0;
-	sem_wait(&sems[mem[IP + 1]]);
-	ports[mem[IP + 1]] = registers[A];
+	//sem_wait(&sems[mem[IP + 1]]);
+	out_ports[mem[IP + 1]] = registers[A];
 	has_been_updated |= 1 << 4;
 
 	// shift register
 	if (mem[IP + 1] == 4)
 	{
 		val >>= 8;
-		val += ports[4] << 8;
-		ports[3] = val >> (8 - (ports[2] & 7));
+		val += out_ports[4] << 8;
+		in_ports[3] = val >> (8 - (out_ports[2] & 7));
 	}
 
-	sem_post(&sems[mem[IP + 1]]);
+	//sem_post(&sems[mem[IP + 1]]);
 	IP += 2;
-	cycle_sleep(3);
+	cycle_sleep(10);
 }
 
 void ei(void)
 {
 	can_interrupt = true;
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void di(void)
@@ -734,20 +746,19 @@ void di(void)
 	can_interrupt = false;
 	actually_can_interrupt = false;
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void hlt(void)
 {
 	printf("Halted\n");
-	IP++;
-	cycle_sleep(1);
+	cycle_sleep(7);
 }
 
 void nop(void)
 {
 	IP++;
-	cycle_sleep(1);
+	cycle_sleep(4);
 }
 
 void invalid(void)

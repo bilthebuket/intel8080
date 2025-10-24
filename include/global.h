@@ -14,7 +14,7 @@
 
 
 //#define CYCLES_PER_INTERRUPT 17066.66666667
-#define CYCLES_PER_INTERRUPT 17067
+#define CYCLES_PER_INTERRUPT 17066
 
 // a single assembly instruction, where the extern unsigned char is the actual instruction and extern unsigned short
 // contains the subsquent data/memory address
@@ -42,7 +42,7 @@ extern const int FLAG_Z; // if the result of an mem[IP] is zero
 extern const int FLAG_S; // if the result of an mem[IP] leads to the sign bit (most siginificant bit) being 1
 extern const int FLAG_P; // if the reuslt of an mem[IP] is even
 extern const int FLAG_C; // if there is a wrap around
-extern const int FLAG_A; // if there was a carry out of bit 3 into bit 4
+extern const int FLAG_A; // if there was a carry out of bit 3 into bit 4 or borrow from 4 into 3
 
 extern const int FLAG_Z_BIT;
 extern const int FLAG_S_BIT;
@@ -79,7 +79,8 @@ extern bool can_interrupt;
 extern bool actually_can_interrupt;
 
 extern sem_t sems[NUM_PORTS];
-extern unsigned char ports[NUM_PORTS];
+extern unsigned char out_ports[NUM_PORTS];
+extern unsigned char in_ports[NUM_PORTS];
 
 // bit flag for if a port has been updated
 extern unsigned char has_been_updated;
@@ -95,6 +96,12 @@ extern const char* names[NUM_INSTRUCTIONS];
 extern condition_check condition_checks[NUM_CONDITIONS];
 
 extern int num_executions;
+
+// !!IMPORTANT NOTE!!
+// int the intel8080 manual, a cycle is define as a bus operation (r/w memory, etc.), 
+// whereas a state is raw cpu tick. So since the 8080 is a 2.048 MHz cpu, that means 
+// it executes 2.048 million STATES per second. However, I've already called it cycles 
+// and i couln't be bothered to change it
 extern int num_cycles_executed;
 
 #endif

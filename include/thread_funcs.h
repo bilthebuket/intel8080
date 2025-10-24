@@ -3,6 +3,6 @@
 
 void* emulated_cpu_func(void*);
 
-void* shift_register_func(void*);
+//void* shift_register_func(void*);
 
 #endif
