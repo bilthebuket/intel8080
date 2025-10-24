@@ -73,6 +73,10 @@ int main(int argc, char* argv)
 					case 'c':
 						ports[1] |= 1;
 						break;
+
+					case '1':
+						ports[1] |= 1 << 2;
+						break;
 				}
 			}
 			else if (event.type == SDL_KEYUP)
@@ -93,6 +97,10 @@ int main(int argc, char* argv)
 
 					case 'c':
 						ports[1] &= 254;
+						break;
+
+					case '1':
+						ports[1] &= (255 ^ (1 << 2));
 						break;
 				}
 			}
@@ -119,6 +127,7 @@ int main(int argc, char* argv)
 				}
 			}
 
+			/*
 			if (i == (0x3FE0 - 0x2400) / 2)
 			{
 				sem_wait(&sems[7]);
@@ -128,16 +137,20 @@ int main(int argc, char* argv)
 				SDL_Delay(time_to_sleep);
 				elapsed_time = SDL_GetTicks();
 			}
+			*/
 		}
 
+		/*
 		sem_wait(&sems[7]);
 		ports[7] = 2;
 		sem_post(&sems[7]);
 
-		SDL_RenderPresent(renderer);
 		int time_to_sleep = 8 - SDL_GetTicks() + elapsed_time;
 		SDL_Delay(time_to_sleep);
 		elapsed_time = SDL_GetTicks();
+		*/
+
+		SDL_RenderPresent(renderer);
 	}
 
 	SDL_DestroyRenderer(renderer);

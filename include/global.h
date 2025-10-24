@@ -12,7 +12,9 @@
 #define NUM_CONDITIONS 8
 #define NUM_PORTS 8
 
-#define CYCLES_PER_INTERRUPT 16667
+
+//#define CYCLES_PER_INTERRUPT 17066.66666667
+#define CYCLES_PER_INTERRUPT 17067
 
 // a single assembly instruction, where the extern unsigned char is the actual instruction and extern unsigned short
 // contains the subsquent data/memory address

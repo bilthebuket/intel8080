@@ -440,6 +440,18 @@ bool minus(void)
 
 void cycle_sleep(int num_cycles)
 {
+	double time;
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+
+	time = (double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 + (double) num_cycles * 100000.0;
+
+	while ((double) ts.tv_sec * 1000000000000.0 + (double) ts.tv_nsec * 1000.0 < time)
+	{
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+	}
+	num_cycles_executed += num_cycles;
+	/*
 	static double time = 0;
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -457,6 +469,7 @@ void cycle_sleep(int num_cycles)
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 	}
 	num_cycles_executed += num_cycles;
+	*/
 }
 
 void print_debug_info(void)

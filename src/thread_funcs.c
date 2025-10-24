@@ -31,59 +31,60 @@ void* emulated_cpu_func(void*)
 	int interrupt = 1;
 	while (true)
 	{
-		// print_debug_info();
+		//printf("%lf\n", num_cycles_executed);
+		//print_debug_info();
 
 		// checking for hardware interrupt (i'm using port 7 to send hardware interrupts from the screen to the cpu because space invaders didn't use it)
-		if (can_interrupt)
+		if (actually_can_interrupt)
 		{
-			if (!actually_can_interrupt)
+			if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
 			{
-				actually_can_interrupt = true;
-			}
-			else
-			{
-				if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
+				//printf("Interrupt %d!\n", interrupt);
+
+				if (mem[IP] == 118)
 				{
-					if (interrupt == 1)
-					{
-						mem[SP - 1] = (IP + 1) >> 8;
-						mem[SP - 2] = (IP + 1) & 255;
-						SP -= 2;
-						IP = rst_addrs[1];
-						cycle_sleep(3);
-					}
-					else
-					{
-						mem[SP - 1] = (IP + 1) >> 8;
-						mem[SP - 2] = (IP + 1) & 255;
-						SP -= 2;
-						IP = rst_addrs[2];
-						cycle_sleep(3);
-					}
+					IP++;
 				}
-				/*
-				sem_wait(&sems[7]);
-				if (ports[7] == 1)
+				if (interrupt == 1)
 				{
-					mem[SP - 1] = (IP + 1) >> 8;
-					mem[SP - 2] = (IP + 1) & 255;
+
+					mem[SP - 1] = IP >> 8;
+					mem[SP - 2] = IP & 255;
 					SP -= 2;
 					IP = rst_addrs[1];
-					ports[7] = 0;
 					cycle_sleep(3);
 				}
-				else if (ports[7] == 2)
+				else
 				{
-					mem[SP - 1] = (IP + 1) >> 8;
-					mem[SP - 2] = (IP + 1) & 255;
+					mem[SP - 1] = IP >> 8;
+					mem[SP - 2] = IP & 255;
 					SP -= 2;
 					IP = rst_addrs[2];
-					ports[7] = 0;
 					cycle_sleep(3);
 				}
-				sem_post(&sems[7]);
-				*/
 			}
+			/*
+			sem_wait(&sems[7]);
+			if (ports[7] == 1)
+			{
+				mem[SP - 1] = (IP + 1) >> 8;
+				mem[SP - 2] = (IP + 1) & 255;
+				SP -= 2;
+				IP = rst_addrs[1];
+				ports[7] = 0;
+				cycle_sleep(3);
+			}
+			else if (ports[7] == 2)
+			{
+				mem[SP - 1] = (IP + 1) >> 8;
+				mem[SP - 2] = (IP + 1) & 255;
+				SP -= 2;
+				IP = rst_addrs[2];
+				ports[7] = 0;
+				cycle_sleep(3);
+			}
+			sem_post(&sems[7]);
+			*/
 		}
 
 		if (num_cycles_executed >= CYCLES_PER_INTERRUPT)
@@ -101,6 +102,7 @@ void* emulated_cpu_func(void*)
 
 		if (mem[IP] == 118) // HLT
 		{
+			cycle_sleep(1);
 			continue;
 		}
 
@@ -138,6 +140,11 @@ void* emulated_cpu_func(void*)
 		(*instructions[mem[IP]])();
 		fflush(stdout);
 		num_executions++;
+
+		if (can_interrupt && !actually_can_interrupt)
+		{
+			actually_can_interrupt = true;
+		}
 	}
 
 	return NULL;
