@@ -7,9 +7,15 @@ The program uses two threads, one for the display and one to emulate the cpu
 
 c = enter coin
 1 = start game (1 player)
+2 = start game (2 player)
+
 a = move left (player 1)
 d = move right (player 1)
 space = fire (player 1)
+
+left arrow = move left (player 2)
+right arrow = move right (player 2)
+up arrow = fire (player 2)
 
 --> files <--
 

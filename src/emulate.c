@@ -70,6 +70,18 @@ int main(int argc, char* argv)
 						in_ports[1] |= 1 << 4;
 						break;
 
+					case SDLK_LEFT:
+						in_ports[2] |= 1 << 5;
+						break;
+
+					case SDLK_RIGHT:
+						in_ports[2] |= 1 << 6;
+						break;
+
+					case SDLK_UP:
+						in_ports[2] |= 1 << 4;
+						break;
+
 					case 'c':
 						in_ports[1] |= 1;
 						break;
@@ -78,7 +90,12 @@ int main(int argc, char* argv)
 						in_ports[1] |= 1 << 2;
 						break;
 
+					case '2':
+						in_ports[1] |= 1 << 1;
+						break;
+
 					case 'b':
+						// for debugging
 						int do_something = 5;
 						break;
 				}
@@ -99,12 +116,28 @@ int main(int argc, char* argv)
 						in_ports[1] &= (255 ^ (1 << 4));
 						break;
 
+					case SDLK_LEFT:
+						in_ports[2] &= (255 ^ (1 << 5));
+						break;
+
+					case SDLK_RIGHT:
+						in_ports[2] &= (255 ^ (1 << 6));
+						break;
+
+					case SDLK_UP:
+						in_ports[2] &= (255 ^ (1 << 4));
+						break;
+
 					case 'c':
 						in_ports[1] &= 254;
 						break;
 
 					case '1':
 						in_ports[1] &= (255 ^ (1 << 2));
+						break;
+
+					case '2':
+						in_ports[1] &= (255 ^ (1 << 1));
 						break;
 				}
 			}
