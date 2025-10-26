@@ -154,6 +154,10 @@ int main(int argc, char* argv)
 		elapsed_time = SDL_GetTicks();
 		*/
 
+		int time_to_sleep = 17 - SDL_GetTicks() + elapsed_time;
+		SDL_Delay(time_to_sleep);
+		elapsed_time = SDL_GetTicks();
+
 		SDL_RenderPresent(renderer);
 	}
 
